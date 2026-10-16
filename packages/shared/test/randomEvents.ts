@@ -209,7 +209,8 @@ export function randomEvents(count: number, seed: number, opts: { voids?: boolea
       }
       case 18:
         push('scene_changed', { scene: { locationKey: 'manual', title: 'Manual', description: '' } });
-        push('chapter_closed', { chapterNo: idCounter, level: 0, fromSeq: 1, toSeq: state.seq });
+        push('chapter_closed', { chapterNo: idCounter, level: 0, fromSeq: 1, toSeq: state.seq, summary: 'A chapter.' });
+        if (r.chance(0.5)) push('session_recap', { number: 1, text: 'Previously…' });
         break;
       case 19:
         push('host_override', {

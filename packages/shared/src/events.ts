@@ -46,6 +46,7 @@ export const EVENT_TYPES = [
   'session_ended',
   'approval_requested',
   'approval_resolved',
+  'session_recap',
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
@@ -204,6 +205,7 @@ export const PAYLOAD_SCHEMAS = {
     level: z.union([z.literal(0), z.literal(1)]),
     fromSeq: z.number().int().min(1),
     toSeq: z.number().int().min(1),
+    summary: z.string().max(4000).optional(),
   }),
   host_override: z.object({ override: HostOverrideSchema, reason: z.string().max(300).optional() }),
   turn_voided: z.object({ turnId: IdSchema }),
@@ -215,6 +217,7 @@ export const PAYLOAD_SCHEMAS = {
   spotlight_set: z.object({ playerId: IdSchema.nullable() }),
   session_started: z.object({ number: z.number().int().min(1) }),
   session_ended: z.object({ number: z.number().int().min(1) }),
+  session_recap: z.object({ number: z.number().int().min(1), text: z.string().min(1).max(4000) }),
   approval_requested: z.object({ approval: ApprovalSchema }),
   approval_resolved: z.object({
     approvalId: IdSchema,
@@ -269,6 +272,7 @@ export const GameEventSchema = z.discriminatedUnion('type', [
   eventSchema('session_ended'),
   eventSchema('approval_requested'),
   eventSchema('approval_resolved'),
+  eventSchema('session_recap'),
 ]);
 export type GameEvent = z.infer<typeof GameEventSchema>;
 export type EventOf<T extends EventType> = Extract<GameEvent, { type: T }>;

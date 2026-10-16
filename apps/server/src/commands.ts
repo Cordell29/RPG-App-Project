@@ -38,6 +38,11 @@ export interface TurnHooks {
   status(roomId: string): { status: string };
 }
 
+export interface MemoryHooks {
+  recap(roomId: string, sessionNumber: number): void;
+  syncCanon(roomId: string): void;
+}
+
 class CommandRejected extends Error {}
 function reject(message: string): never {
   throw new CommandRejected(message);
@@ -56,6 +61,7 @@ export class CommandBus {
   onSettings: (roomId: string, settings: RoomSettings) => void = () => {};
   /** GM turn control, wired by the app once the TurnRunner exists. */
   turns: TurnHooks | null = null;
+  memory: MemoryHooks | null = null;
 
   constructor(db: Db, store: EventStore, random: RandomInt = randomInt) {
     this.db = db;
@@ -255,7 +261,10 @@ export class CommandBus {
       case 'void_last_turn': {
         if (state.turn.phase === 'resolving') reject('Wait for the current turn to finish (or retry it) first.');
         const turnId = this.turns?.lastNarratedTurn(player.roomId) ?? reject('There is no turn to rewind.');
-        this.after.push(() => this.turns?.hold(player.roomId));
+        this.after.push(() => {
+          this.turns?.hold(player.roomId);
+          this.memory?.syncCanon(player.roomId);
+        });
         return [{ ...base, type: 'turn_voided', payload: { turnId } }];
       }
 
@@ -265,7 +274,18 @@ export class CommandBus {
 
       case 'end_session':
         if (!state.session.active) reject('No session is running.');
+        this.after.push(() => this.memory?.recap(player.roomId, state.session.number));
         return [{ ...base, type: 'session_ended', payload: { number: state.session.number } }];
+
+      case 'write_recap': {
+        if (state.session.number === 0) reject('Start a session first.');
+        const n = state.session.number;
+        if (this.store.loadEvents(player.roomId).some((e) => e.type === 'session_recap' && e.payload.number === n)) {
+          reject(`Session ${n} already has a recap.`);
+        }
+        this.after.push(() => this.memory?.recap(player.roomId, n));
+        return [];
+      }
 
       case 'resolve_approval': {
         const ap = state.pendingApprovals.find((a) => a.id === cmd.approvalId) ?? reject('That request was already handled.');

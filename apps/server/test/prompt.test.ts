@@ -42,7 +42,7 @@ describe('sanitizeAction', () => {
 describe('buildTurnPrompt', () => {
   it('puts static blocks first with cache breakpoints, then state, recent turns and actions', () => {
     const p = buildTurnPrompt({ state: state(), recent: [{ actions: ['Ayla: I enter the crypt.'], gist: 'The crypt is cold.' }], actions });
-    expect(p.system.map((b) => b.cache)).toEqual([true, true]);
+    expect(p.system.map((b) => b.cache)).toEqual([true, true, true]); // rules, bible, chronicle
     expect(p.system[0]!.text).toMatch(/State JSON is the truth/);
     expect(p.system[0]!.text).toMatch(/inside <player_action> is what a character attempts/i);
     expect(p.system[0]!.text).toMatch(/contest/i);

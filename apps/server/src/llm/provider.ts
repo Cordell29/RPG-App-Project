@@ -11,7 +11,15 @@ export interface Usage {
   cacheWriteTokens?: number;
 }
 
-export type LLMPurpose = 'setting_draft' | 'character_draft' | 'ability_draft' | 'gm_adjudicate' | 'gm_narrate';
+export type LLMPurpose =
+  | 'setting_draft'
+  | 'character_draft'
+  | 'ability_draft'
+  | 'gm_adjudicate'
+  | 'gm_narrate'
+  | 'chronicle_chapter'
+  | 'chronicle_arc'
+  | 'session_recap';
 export type Tier = 'summary' | 'turn';
 
 export interface StructuredRequest<T> {

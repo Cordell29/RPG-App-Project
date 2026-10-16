@@ -10,6 +10,7 @@ import { LLMError, type LLMProvider } from './llm/provider.ts';
 import { draftCharacter } from './llm/characterDraft.ts';
 import { draftSetting } from './llm/settingDraft.ts';
 import { TurnRunner } from './gm/turns.ts';
+import { Chronicler } from './memory/chronicle.ts';
 import { draftAbility } from './llm/abilityDraft.ts';
 import { type TavernIo, attachRealtime } from './realtime.ts';
 import { CreateRoomSchema, RoomError, RoomService } from './rooms.ts';
@@ -32,6 +33,7 @@ export interface TavernApp {
   rooms: RoomService;
   commands: CommandBus;
   turns: TurnRunner;
+  memory: Chronicler;
 }
 
 export async function buildApp(deps: AppDeps): Promise<TavernApp> {
@@ -111,7 +113,9 @@ export async function buildApp(deps: AppDeps): Promise<TavernApp> {
 
   await app.ready();
   let io: TavernIo | null = null;
+  const memory = new Chronicler({ db: deps.db, store, llm: deps.llm, onEvents: (roomId, events) => io?.to(roomId).emit('events', events) });
   const turns = new TurnRunner({
+    memory,
     db: deps.db,
     store,
     rooms,
@@ -123,6 +127,7 @@ export async function buildApp(deps: AppDeps): Promise<TavernApp> {
     rulesLookup: deps.rulesLookup ?? true,
   });
   commands.turns = turns;
+  commands.memory = memory;
   io = attachRealtime(app.server, { rooms, store, commands, turnStatus: (roomId) => turns.status(roomId) });
-  return { app, io, store, rooms, commands, turns };
+  return { app, io, store, rooms, commands, turns, memory };
 }

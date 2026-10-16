@@ -119,3 +119,22 @@ test('sci-fi sheets use Starforged-style names with Spirit and Supply', async ({
   await expect(sheet.getByTestId('skills')).toContainText('Precursor Lore');
   await expect(sheet.getByTestId('stat-int')).toContainText('Wits');
 });
+
+test('sessions end with a recap; chapters and world notes live in Story so far', async ({ page }) => {
+  await createRoom(page, { mode: 'solo' });
+  await quickCharacter(page, { role: 'Fighter', name: 'Ayla', order });
+  await page.getByRole('button', { name: 'Start session 1' }).click();
+  await act(page, 'I ask the innkeeper for rumours.');
+  await expect(page.getByTestId('narration')).toHaveCount(1);
+  await page.getByRole('button', { name: 'End session 1' }).click();
+  const recap = page.getByTestId('recap');
+  await expect(recap).toContainText('Previously, in session 1');
+  await expect(recap).toContainText('Previously:');
+  await page.getByRole('button', { name: 'Story so far' }).click();
+  const reader = page.getByTestId('story-reader');
+  await expect(reader).toContainText('Recap of session 1');
+  await reader.getByRole('tab', { name: 'Chapters' }).click();
+  await expect(reader).toContainText('Chapters are written every 10 turns.');
+  await reader.getByRole('tab', { name: 'World notes' }).click();
+  await expect(reader).toContainText('records people, places and factions');
+});

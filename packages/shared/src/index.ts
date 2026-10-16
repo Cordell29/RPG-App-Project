@@ -12,3 +12,5 @@ export * from './protocol.ts';
 export * from './syncClient.ts';
 export * from './character.ts';
 export * from './derived.ts';
+export * from './tokens.ts';
+export * from './canon.ts';

@@ -64,6 +64,19 @@ export function devMockProvider(): MockLLMProvider {
       case 'gm_adjudicate':
       case 'gm_narrate':
         return devGm(req as ChatRequest);
+      case 'chronicle_chapter': {
+        // Offline stand-in: the narration lines, trimmed (a real model writes a proper summary).
+        const t = strip((req as { prompt: string }).prompt);
+        const narr = t.split('\n').filter((l) => l.startsWith('Narration: ')).map((l) => l.slice(11));
+        return { summary: narr.join(' ').split(/\s+/).slice(0, 240).join(' '), canon: [] };
+      }
+      case 'chronicle_arc':
+        return { text: strip((req as { prompt: string }).prompt).split(/\s+/).slice(0, 280).join(' ') };
+      case 'session_recap': {
+        const t = strip((req as { prompt: string }).prompt);
+        const narr = t.split('\n').filter((l) => l.startsWith('Narration: ')).map((l) => l.slice(11));
+        return { text: `Previously: ${narr.join(' ').split(/\s+/).slice(0, 150).join(' ')}` };
+      }
     }
   });
 }

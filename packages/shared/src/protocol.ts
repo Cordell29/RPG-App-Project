@@ -72,6 +72,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
   }),
   z.object({ commandId, type: z.literal('start_session') }),
   z.object({ commandId, type: z.literal('end_session') }),
+  z.object({ commandId, type: z.literal('write_recap') }),
   z.object({
     commandId,
     type: z.literal('resolve_approval'),
@@ -112,6 +113,7 @@ export const HOST_COMMANDS: readonly CommandType[] = [
   'set_turn_mode',
   'start_session',
   'end_session',
+  'write_recap',
   'resolve_approval',
 ];
 

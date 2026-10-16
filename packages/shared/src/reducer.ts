@@ -197,6 +197,7 @@ export function apply(state: GameState, event: GameEvent, options: ApplyOptions 
     case 'delta_rejected':
     case 'image_requested':
     case 'chapter_closed':
+    case 'session_recap':
     case 'campaign_imported':
       break;
 

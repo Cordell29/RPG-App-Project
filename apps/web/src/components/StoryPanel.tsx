@@ -1,7 +1,7 @@
 import { type EventOf, LIMITS } from '@tavern/shared';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { listVoices, speechSupported, useSpeech } from '../lib/speech.ts';
-import { type StoryTurn, buildStory } from '../lib/story.ts';
+import { type StoryTurn, buildStory, latestRecap } from '../lib/story.ts';
 import { playerName, useRoom } from '../lib/store.ts';
 import { ApprovalQueue } from './ApprovalQueue.tsx';
 import { StoryReader } from './StoryReader.tsx';
@@ -148,6 +148,11 @@ function HostTurnControls() {
         <button type="button" className="btn py-1 text-sm" onClick={() => run({ type: state.session.active ? 'end_session' : 'start_session' })}>
           {state.session.active ? `End session ${state.session.number}` : `Start session ${state.session.number + 1}`}
         </button>
+        {state.session.number > 0 && (
+          <button type="button" className="btn py-1 text-sm" onClick={() => run({ type: 'write_recap' })}>
+            Write recap
+          </button>
+        )}
         {settings?.mode === 'group' && (
           <label className="flex items-center gap-1">
             <span className="sr-only">Turn mode</span>
@@ -335,7 +340,8 @@ export function StoryPanel() {
   const [showVoice, setShowVoice] = useState(false);
   const entries = useMemo(() => buildStory(events, state), [events, state]);
   const turns = entries.filter((e) => e.kind === 'turn');
-  const recent = entries.slice(-12);
+  const recent = entries.filter((e) => e.kind !== 'recap').slice(-12);
+  const recap = useMemo(() => latestRecap(events), [events]);
   const lastNarration = [...turns].reverse().find((t) => t.kind === 'turn' && t.turn.narration);
   const suggestions = lastNarration?.kind === 'turn' && state.turn.phase !== 'resolving' ? (lastNarration.turn.narration?.suggestions ?? []) : [];
   const endRef = useRef<HTMLDivElement>(null);
@@ -371,6 +377,18 @@ export function StoryPanel() {
       )}
       {isHost && <HostTurnControls />}
       {isHost && <ApprovalQueue />}
+
+      {recap && (
+        <aside className="rounded-[var(--t-radius)] border border-accent bg-raised p-3" aria-label="Recap" data-testid="recap">
+          <div className="flex items-start gap-2">
+            <div className="flex-1">
+              <h3 className="heading text-sm">Previously, in session {recap.number}…</h3>
+              <p className="mt-1 text-sm italic leading-relaxed">{recap.text}</p>
+            </div>
+            <SpeakButton text={recap.text} seq={recap.seq} />
+          </div>
+        </aside>
+      )}
 
       {turns.length === 0 && !streaming && (
         <div className="space-y-2">

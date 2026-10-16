@@ -15,7 +15,9 @@ import { turns } from '../db/schema.ts';
 import { type LLMProvider, type LlmMessage, RULES_DOMAINS, type Usage } from '../llm/provider.ts';
 import type { RoomService } from '../rooms.ts';
 import { Adjudicator } from './adjudicator.ts';
+import type { Chronicler } from '../memory/chronicle.ts';
 import {
+  type BudgetReport,
   type RecentTurn,
   type ResolutionLog,
   type TurnAction,
@@ -43,6 +45,8 @@ export interface TurnRunnerDeps {
   timeoutMs?: number;
   /** Let the GM consult rules sources with web search (on by default). */
   rulesLookup?: boolean;
+  /** Long-term memory: chronicle, canon and recaps. */
+  memory?: Chronicler;
 }
 
 /**
@@ -54,7 +58,8 @@ export interface TurnRunnerDeps {
  * commit leaves nothing behind; actions stay queued and the host can retry.
  */
 export class TurnRunner {
-  private readonly d: Required<Omit<TurnRunnerDeps, 'random' | 'newId' | 'timeoutMs' | 'rulesLookup'>> & {
+  private readonly d: Required<Omit<TurnRunnerDeps, 'random' | 'newId' | 'timeoutMs' | 'rulesLookup' | 'memory'>> & {
+    memory: Chronicler | null;
     random: RandomInt;
     newId: () => string;
     timeoutMs: number;
@@ -67,9 +72,11 @@ export class TurnRunner {
   private readonly held = new Set<string>();
   /** Adjudication calls started per room (tests assert "exactly one GM call"). */
   readonly gmTurns = new Map<string, number>();
+  /** Token budget report of the most recent GM prompt per room. */
+  readonly lastBudget = new Map<string, BudgetReport>();
 
   constructor(deps: TurnRunnerDeps) {
-    this.d = { random: randomInt, newId: defaultNewId, timeoutMs: 60_000, rulesLookup: true, ...deps };
+    this.d = { random: randomInt, newId: defaultNewId, timeoutMs: 60_000, rulesLookup: true, memory: null, ...deps };
   }
 
   status(roomId: string): TurnStatus {
@@ -223,7 +230,13 @@ export class TurnRunner {
     let adj: Adjudicator;
     try {
       adj = new Adjudicator({ state, settings, turnId, random: this.d.random, newId: this.d.newId });
-      const prompt = buildTurnPrompt({ state, recent: this.recentTurns(roomId, state), actions });
+      const prompt = buildTurnPrompt({
+        state,
+        recent: this.recentTurns(roomId, state),
+        actions,
+        ...(this.d.memory ? { chronicle: this.d.memory.chronicle(roomId), canon: this.d.memory.canon(roomId) } : {}),
+      });
+      this.lastBudget.set(roomId, prompt.budget);
       const tools = toolSpecs();
       const messages: LlmMessage[] = [{ role: 'user', content: prompt.user }];
       for (let round = 0; round < MAX_ADJUDICATION_ROUNDS && !adj.done; round++) {
@@ -317,6 +330,10 @@ export class TurnRunner {
       this.d.onEvents(roomId, committed);
       this.d.db.update(turns).set({ status: 'done', usageJson: JSON.stringify(total) }).where(eq(turns.id, turnId)).run();
       this.setStatus(roomId, { status: 'idle' });
+      if (this.d.memory) {
+        if (resolution.applied.some((a) => a.startsWith('canon recorded'))) this.d.memory.syncCanon(roomId);
+        this.d.memory.afterTurn(roomId);
+      }
     } catch (err) {
       const message = (err as Error).message || 'Narration failed.';
       this.d.db.update(turns).set({ status: 'failed', error: message }).where(eq(turns.id, turnId)).run();

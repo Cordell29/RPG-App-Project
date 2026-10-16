@@ -1,7 +1,9 @@
 import {
+  type CanonEntry,
   type Character,
   type GameState,
   DEFAULT_SKILL_LABELS,
+  estimateTokens,
   SKILL_KEYS,
   STAT_KEYS,
   effectiveAc,
@@ -121,44 +123,56 @@ function effectSummary(c: Character, i: Character['inventory'][number]): string 
   return parts.join(', ');
 }
 
-/** The state block: scoped to the scene, party and active quests, with ids for tool calls. */
-export function stateView(state: GameState) {
+/**
+ * The state block: scene, party (with ids for tool calls) and active quests.
+ * `level` trims detail when the block is over budget (A14 degradation order):
+ * 0 full · 1 no item notes · 2 ability descriptions ≤120 chars · 3 plain items by name only,
+ * no ability descriptions · 4 plain items counted, abilities as id/name/uses only.
+ */
+export function stateView(state: GameState, level = 0) {
   const player = (id: string) => state.players.find((p) => p.id === id)?.displayName;
   return {
     scene: state.scene,
-    party: state.party.map((c) => ({
-      id: c.id,
-      name: c.name,
-      player: player(c.playerId),
-      class: [c.ancestry, c.class].filter(Boolean).join(' '),
-      level: c.level,
-      hp: `${c.hp.current}/${c.hp.max}`,
-      ac: effectiveAc(c),
-      stats: c.stats,
-      proficientSkills: c.proficiencies.skills.map((k) => skillLabel(state.setting, k)),
-      proficientSaves: c.proficiencies.saves,
-      ...(c.conditions.length ? { conditions: c.conditions } : {}),
-      ...(Object.keys(c.meters).length
-        ? { meters: Object.fromEntries(Object.entries(c.meters).map(([k, m]) => [k, `${m.current}/${m.max}`])) }
-        : {}),
-      [state.setting?.currencyName ?? 'gold']: c.gold,
-      inventory: c.inventory.map((i) => ({
-        instanceId: i.instanceId,
-        name: i.name,
-        ...(i.qty > 1 ? { qty: i.qty } : {}),
-        ...(i.equipped ? { equipped: true } : {}),
-        ...(effectSummary(c, i) ? { effects: effectSummary(c, i) } : {}),
-      })),
-      abilities: c.abilities.map((a) => ({
-        id: a.id,
-        name: a.name,
-        ...(a.uses ? { uses: `${a.uses.current}/${a.uses.max}`, recharge: a.recharge } : {}),
-        description: a.description,
-      })),
-      ...(c.spellSlots.some((s) => s.max > 0)
-        ? { [state.setting?.slotsLabel ?? 'Spell slots']: c.spellSlots.map((s, i) => `${ord(i + 1)}: ${s.current}/${s.max}`).join(', ') }
-        : {}),
-    })),
+    party: state.party.map((c) => {
+      const notable = c.inventory.filter((i) => level < 3 || i.equipped || i.effects);
+      const plain = c.inventory.filter((i) => !notable.includes(i));
+      return {
+        id: c.id,
+        name: c.name,
+        player: player(c.playerId),
+        class: [c.ancestry, c.class].filter(Boolean).join(' '),
+        level: c.level,
+        hp: `${c.hp.current}/${c.hp.max}`,
+        ac: effectiveAc(c),
+        stats: c.stats,
+        proficientSkills: c.proficiencies.skills.map((k) => skillLabel(state.setting, k)),
+        proficientSaves: c.proficiencies.saves,
+        ...(c.conditions.length ? { conditions: c.conditions } : {}),
+        ...(Object.keys(c.meters).length
+          ? { meters: Object.fromEntries(Object.entries(c.meters).map(([k, m]) => [k, `${m.current}/${m.max}`])) }
+          : {}),
+        [state.setting?.currencyName ?? 'gold']: c.gold,
+        inventory: notable.map((i) => ({
+          instanceId: i.instanceId,
+          name: i.name,
+          ...(i.qty > 1 ? { qty: i.qty } : {}),
+          ...(i.equipped ? { equipped: true } : {}),
+          ...(effectSummary(c, i) ? { effects: effectSummary(c, i) } : {}),
+          ...(level === 0 && i.notes ? { notes: i.notes } : {}),
+        })),
+        ...(plain.length ? { otherItems: level >= 4 ? `${plain.length} ordinary items` : plain.map((i) => i.name).join(', ') } : {}),
+        abilities: c.abilities.map((a) => ({
+          id: a.id,
+          name: a.name,
+          ...(a.uses ? { uses: `${a.uses.current}/${a.uses.max}` } : {}),
+          ...(level < 4 && a.uses ? { recharge: a.recharge } : {}),
+          ...(level < 2 ? { description: a.description } : level === 2 ? { description: a.description.slice(0, 120) } : {}),
+        })),
+        ...(c.spellSlots.some((s) => s.max > 0)
+          ? { [state.setting?.slotsLabel ?? 'Spell slots']: c.spellSlots.map((s, i) => `${ord(i + 1)}: ${s.current}/${s.max}`).join(', ') }
+          : {}),
+      };
+    }),
     quests: state.quests.filter((q) => q.status === 'active'),
     ...(Object.keys(state.flags).length ? { flags: state.flags } : {}),
   };
@@ -174,24 +188,139 @@ export function formatActions(state: GameState, actions: TurnAction[]): string {
     .join('\n');
 }
 
-export function buildTurnPrompt(opts: { state: GameState; recent: RecentTurn[]; actions: TurnAction[] }) {
-  const { state, recent, actions } = opts;
-  const recentText = recent.length
+/** Token caps per prompt block (spec A14). They sum to the total, so it cannot be exceeded. */
+export const BUDGETS = { systemBible: 3000, chronicle: 3000, canon: 1500, state: 2500, recent: 2000, total: 12000, minRecentTurns: 4 } as const;
+
+export type { CanonEntry } from '@tavern/shared';
+
+export interface Chronicle {
+  arcs: string[];
+  chapters: string[];
+}
+
+export function systemBibleTokens(state: GameState): number {
+  return estimateTokens(GM_RULES) + estimateTokens(`<campaign_bible>\n${bible(state)}\n</campaign_bible>`);
+}
+
+const words = (s: string) => s.toLowerCase().replace(/_/g, ' ');
+const mentions = (haystack: string, needle: string) => {
+  const n = words(needle).trim();
+  if (n.length < 2) return false;
+  return new RegExp(`(^|[^a-z0-9])${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^a-z0-9])`).test(haystack);
+};
+
+/** Canon entries mentioned in the recent text or matching the location; newest first, within budget. */
+export function selectCanon(entries: CanonEntry[], ctx: { text: string; locationKey: string; budget: number }): CanonEntry[] {
+  const hay = words(ctx.text);
+  const hits = entries
+    .filter((e) => e.key === ctx.locationKey || [e.key, ...e.aliases].some((n) => mentions(hay, n)))
+    .sort((a, b) => b.updatedSeq - a.updatedSeq);
+  const out: CanonEntry[] = [];
+  for (const e of hits) {
+    if (estimateTokens(JSON.stringify([...out, e])) > ctx.budget) continue;
+    out.push(e);
+  }
+  return out;
+}
+
+function chronicleText(arcs: string[], chapters: string[]) {
+  const parts = [
+    ...arcs.map((a, i) => `Arc ${i + 1}: ${a}`),
+    ...chapters.map((c, i) => `Chapter ${i + 1}: ${c}`),
+  ];
+  return parts.length ? `<chronicle>\nThe story so far (oldest first):\n${parts.join('\n\n')}\n</chronicle>` : '<chronicle>\n(No chapters yet.)\n</chronicle>';
+}
+
+function recentText(recent: RecentTurn[]) {
+  return recent.length
     ? recent.map((t, i) => `Turn -${recent.length - i}:\n${t.actions.map((a) => `  ${a}`).join('\n')}\n  Result: ${t.gist}`).join('\n')
     : '(This is the first turn of the campaign. Open with a scene drawn from the setting.)';
-  const user = [
-    `<state>\n${JSON.stringify(stateView(state))}\n</state>`,
-    `<recent_turns>\n${recentText}\n</recent_turns>`,
-    `This turn's actions:\n${formatActions(state, actions)}`,
-    'Resolve these actions with tools (checks, contests, attacks, changes), then call end_adjudication.',
-  ].join('\n\n');
-  return {
-    system: [
-      { text: GM_RULES, cache: true },
-      { text: `<campaign_bible>\n${bible(state)}\n</campaign_bible>`, cache: true },
-    ] satisfies SystemBlock[],
-    user,
+}
+
+export interface BudgetReport {
+  systemBible: number;
+  chronicle: number;
+  canon: number;
+  state: number;
+  recent: number;
+  actions: number;
+  total: number;
+  dropped: string[];
+}
+
+export function buildTurnPrompt(opts: {
+  state: GameState;
+  recent: RecentTurn[];
+  actions: TurnAction[];
+  chronicle?: Chronicle;
+  canon?: CanonEntry[];
+}) {
+  const { state, actions } = opts;
+  const dropped: string[] = [];
+
+  // Chronicle: drop the oldest arcs (then chapters) until it fits.
+  let arcs = [...(opts.chronicle?.arcs ?? [])];
+  let chapters = [...(opts.chronicle?.chapters ?? [])];
+  while (estimateTokens(chronicleText(arcs, chapters)) > BUDGETS.chronicle && (arcs.length || chapters.length > 1)) {
+    if (arcs.length) {
+      arcs = arcs.slice(1);
+      if (!dropped.includes('arcs')) dropped.push('arcs');
+    } else {
+      chapters = chapters.slice(1);
+      if (!dropped.includes('chapters')) dropped.push('chapters');
+    }
+  }
+  const chronicle = chronicleText(arcs, chapters);
+
+  // State: trim detail level by level until it fits.
+  let level = 0;
+  let stateJson = JSON.stringify(stateView(state, level));
+  while (estimateTokens(stateJson) > BUDGETS.state - 10 && level < 4) {
+    level += 1;
+    stateJson = JSON.stringify(stateView(state, level));
+  }
+  if (level > 0) dropped.push(`state-level-${level}`);
+  const stateBlock = `<state>\n${stateJson}\n</state>`;
+
+  // Recent turns: drop the oldest, keep at least 4, then shorten each if still over.
+  let recent = [...opts.recent];
+  while (estimateTokens(recentText(recent)) > BUDGETS.recent && recent.length > BUDGETS.minRecentTurns) recent = recent.slice(1);
+  if (recent.length < opts.recent.length) dropped.push('old-turns');
+  if (estimateTokens(recentText(recent)) > BUDGETS.recent) {
+    const per = Math.floor((BUDGETS.recent * 3.5 - 200) / Math.max(1, recent.length) / 2);
+    recent = recent.map((t) => ({ actions: t.actions.map((a) => a.slice(0, Math.floor(per / Math.max(1, t.actions.length)))), gist: t.gist.slice(0, per) }));
+    dropped.push('shortened-turns');
+  }
+  const recentBlock = `<recent_turns>\n${recentText(recent)}\n</recent_turns>`;
+
+  // Canon: entries named in recent turns, this turn's actions or the current location.
+  const context = [recentText(recent), ...actions.map((a) => a.text), state.scene.locationKey, state.scene.title].join('\n');
+  const canon = selectCanon(opts.canon ?? [], { text: context, locationKey: state.scene.locationKey, budget: BUDGETS.canon - 20 });
+  const canonBlock = canon.length
+    ? `<canon>\n${canon.map((e) => `${e.kind} ${e.key}${e.aliases.length ? ` (also: ${e.aliases.join(', ')})` : ''}: ${e.facts.join('; ')}`).join('\n')}\n</canon>`
+    : '';
+
+  const actionBlock = `This turn's actions:\n${formatActions(state, actions)}\n\nResolve these actions with tools (checks, contests, attacks, changes), then call end_adjudication.`;
+  const user = [canonBlock, stateBlock, recentBlock, actionBlock].filter(Boolean).join('\n\n');
+  const system = [
+    { text: GM_RULES, cache: true },
+    { text: `<campaign_bible>\n${bible(state)}\n</campaign_bible>`, cache: true },
+    { text: chronicle, cache: true },
+  ] satisfies SystemBlock[];
+
+  const budget: BudgetReport = {
+    systemBible: systemBibleTokens(state),
+    chronicle: estimateTokens(chronicle),
+    canon: estimateTokens(canonBlock),
+    state: estimateTokens(stateBlock),
+    recent: estimateTokens(recentBlock),
+    actions: estimateTokens(actionBlock),
+    total: 0,
+    dropped,
   };
+  budget.total = estimateTokens(system.map((b) => b.text).join('') + user);
+  if (budget.total > BUDGETS.total) console.error('[prompt] OVER BUDGET', budget);
+  return { system, user, budget };
 }
 
 export const NARRATOR_RULES = `You are the narrator of a tabletop roleplaying game. The Game Master has already resolved this turn; you describe it.

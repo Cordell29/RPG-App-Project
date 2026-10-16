@@ -718,6 +718,13 @@ forType('turn_voided', () => {
   });
 });
 
+forType('session_recap', () => {
+  it('changes nothing but seq', () => {
+    const { before, after } = step(seededLog(), (l) => l.push('session_recap', { number: 1, text: 'Previously on…' }));
+    expectOnlySeqChanged(before, after);
+  });
+});
+
 forType('campaign_imported', () => {
   it('changes nothing but seq', () => {
     const { before, after } = step(seededLog(), (l) =>

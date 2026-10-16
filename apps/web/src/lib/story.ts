@@ -9,7 +9,33 @@ export interface StoryTurn {
   narration: { seq: number; text: string; suggestions: string[] } | null;
 }
 
-export type StoryEntry = { kind: 'turn'; turn: StoryTurn } | { kind: 'session'; number: number; started: boolean; seq: number };
+export type StoryEntry =
+  | { kind: 'turn'; turn: StoryTurn }
+  | { kind: 'session'; number: number; started: boolean; seq: number }
+  | { kind: 'recap'; number: number; text: string; seq: number };
+
+export interface ChronicleEntry {
+  level: 0 | 1;
+  number: number;
+  summary: string;
+  seq: number;
+}
+
+/** Chapters and arcs, oldest first. */
+export function buildChronicle(events: GameEvent[]): ChronicleEntry[] {
+  return events.flatMap((e) =>
+    e.type === 'chapter_closed' && e.payload.summary ? [{ level: e.payload.level, number: e.payload.chapterNo, summary: e.payload.summary, seq: e.seq }] : [],
+  );
+}
+
+/** The newest recap, if any. */
+export function latestRecap(events: GameEvent[]) {
+  for (let i = events.length - 1; i >= 0; i--) {
+    const e = events[i]!;
+    if (e.type === 'session_recap') return { number: e.payload.number, text: e.payload.text, seq: e.seq };
+  }
+  return null;
+}
 
 /** Folds the event log into turns (skipping rewound ones) and session markers. */
 export function buildStory(events: GameEvent[], state: GameState): StoryEntry[] {
@@ -30,6 +56,8 @@ export function buildStory(events: GameEvent[], state: GameState): StoryEntry[] 
     } else if (e.type === 'session_started' || e.type === 'session_ended') {
       session = e.payload.number;
       out.push({ kind: 'session', number: e.payload.number, started: e.type === 'session_started', seq: e.seq });
+    } else if (e.type === 'session_recap') {
+      out.push({ kind: 'recap', number: e.payload.number, text: e.payload.text, seq: e.seq });
     } else if (e.turnId && voided.has(e.turnId)) {
       continue;
     } else if (e.type === 'turn_started') {
@@ -61,6 +89,7 @@ export function storyText(entries: StoryEntry[]): string {
   return entries
     .map((en) => {
       if (en.kind === 'session') return `\n=== Session ${en.number} ${en.started ? 'begins' : 'ends'} ===\n`;
+      if (en.kind === 'recap') return `[Recap of session ${en.number}] ${en.text}\n`;
       const t = en.turn;
       return [...t.actions.map((a) => `> ${a.who}: ${a.text}`), '', t.narration?.text ?? '(no narration)', ''].join('\n');
     })
