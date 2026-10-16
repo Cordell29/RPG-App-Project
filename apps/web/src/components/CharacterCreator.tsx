@@ -11,7 +11,12 @@ import {
   STANDARD_ARRAY,
   STAT_KEYS,
   STAT_ROLL_NOTATION,
+  SKILLS,
+  SKILL_KEYS,
+  type SkillKey,
+  checkProficiencies,
   checkStats,
+  skillLabel,
   pointBuyCost,
   statModifier,
 } from '@tavern/shared';
@@ -124,6 +129,8 @@ export function CharacterCreator({ setting }: { setting: SettingPreset | null })
   const [personal, setPersonal] = useState({ name: '', notes: '' });
   const [method, setMethod] = useState<StatMethod>('standard');
   const [stats, setStats] = useState<Record<StatKey, number>>(BLANK);
+  const [skills, setSkills] = useState<SkillKey[]>([]);
+  const [saves, setSaves] = useState<StatKey[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -154,12 +161,21 @@ export function CharacterCreator({ setting }: { setting: SettingPreset | null })
         }),
     statMethod: method,
     stats: stats as Stats,
+    skills,
+    saves: selectedRole && selectedRole.saves.length === 2 ? [] : saves,
     visualDescriptor: look.trim(),
     notes: notes.trim(),
     ...(personal.name.trim() ? { personalItem: { name: personal.name.trim(), notes: personal.notes.trim() } } : {}),
   };
   const statsProblem = STAT_KEYS.some((k) => !stats[k]) ? 'Assign all six scores.' : checkStats(method, stats as Stats, rolledPool ?? undefined);
-  const problem = !input.name ? 'Give your character a name.' : !input.className ? 'Name your class.' : statsProblem;
+  const skillCount = selectedRole?.skillCount ?? 2;
+  const skillPool: readonly SkillKey[] = selectedRole && selectedRole.skillChoices.length ? selectedRole.skillChoices : SKILL_KEYS;
+  const choosesSaves = !selectedRole || selectedRole.saves.length < 2;
+  const problem = !input.name
+    ? 'Give your character a name.'
+    : !input.className
+      ? 'Name your class.'
+      : (statsProblem ?? checkProficiencies(selectedRole, input.skills, input.saves));
 
   async function draft() {
     if (!creds) return;
@@ -177,6 +193,8 @@ export function CharacterCreator({ setting }: { setting: SettingPreset | null })
       setPersonal({ name: d.personalItem?.name ?? '', notes: d.personalItem?.notes ?? '' });
       setMethod('standard');
       setStats(d.stats);
+      setSkills(d.skills ?? []);
+      setSaves(d.saves ?? []);
       setPath('quick');
     } catch (e) {
       setError((e as Error).message);
@@ -265,13 +283,31 @@ export function CharacterCreator({ setting }: { setting: SettingPreset | null })
                   key={r.name}
                   className={`cursor-pointer rounded-[var(--t-radius)] border p-2 text-sm ${role === r.name ? 'border-accent bg-raised' : 'border-line'}`}
                 >
-                  <input type="radio" name="role" className="sr-only" checked={role === r.name} onChange={() => setRole(r.name)} />
+                  <input
+                    type="radio"
+                    name="role"
+                    className="sr-only"
+                    checked={role === r.name}
+                    onChange={() => {
+                      setRole(r.name);
+                      setSkills([]);
+                    }}
+                  />
                   <span className="font-semibold">{r.name}</span>
                   <span className="block text-xs text-muted">{r.summary}</span>
                 </label>
               ))}
               <label className={`cursor-pointer rounded-[var(--t-radius)] border p-2 text-sm ${role === CUSTOM ? 'border-accent bg-raised' : 'border-line'}`}>
-                <input type="radio" name="role" className="sr-only" checked={role === CUSTOM} onChange={() => setRole(CUSTOM)} />
+                <input
+                  type="radio"
+                  name="role"
+                  className="sr-only"
+                  checked={role === CUSTOM}
+                  onChange={() => {
+                    setRole(CUSTOM);
+                    setSkills([]);
+                  }}
+                />
                 <span className="font-semibold">Custom…</span>
                 <span className="block text-xs text-muted">Invent your own class and a few ordinary items.</span>
               </label>
@@ -334,6 +370,58 @@ export function CharacterCreator({ setting }: { setting: SettingPreset | null })
                   </button>
                 </div>
               ))}
+          </fieldset>
+
+          <fieldset>
+            <legend className="label">
+              Trained skills: pick {skillCount} ({skills.length}/{skillCount})
+            </legend>
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Skills">
+              {skillPool.map((k) => {
+                const on = skills.includes(k);
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    aria-pressed={on}
+                    disabled={!on && skills.length >= skillCount}
+                    onClick={() => setSkills(on ? skills.filter((x) => x !== k) : [...skills, k])}
+                    className={`rounded-full border px-2.5 py-1 text-xs disabled:opacity-40 ${on ? 'border-accent bg-accent text-accent-ink' : 'border-line'}`}
+                  >
+                    {skillLabel(setting, k)} <span className="opacity-70">({setting?.statLabels[SKILLS[k]] ?? SKILLS[k]})</span>
+                  </button>
+                );
+              })}
+            </div>
+            {choosesSaves ? (
+              <>
+                <p className="mt-2 text-xs text-muted">Saving throws: pick 2</p>
+                <div className="mt-1 flex flex-wrap gap-1.5" role="group" aria-label="Saving throws">
+                  {STAT_KEYS.map((k) => {
+                    const on = saves.includes(k);
+                    return (
+                      <button
+                        key={k}
+                        type="button"
+                        aria-pressed={on}
+                        disabled={!on && saves.length >= 2}
+                        onClick={() => setSaves(on ? saves.filter((x) => x !== k) : [...saves, k])}
+                        className={`rounded-full border px-2.5 py-1 text-xs disabled:opacity-40 ${on ? 'border-accent bg-accent text-accent-ink' : 'border-line'}`}
+                      >
+                        {setting?.statLabels[k] ?? k}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            ) : (
+              <p className="mt-2 text-xs text-muted">
+                Saving throws: {selectedRole!.saves.map((k) => setting?.statLabels[k] ?? k).join(' and ')}
+              </p>
+            )}
+            {selectedRole && selectedRole.abilities.length > 0 && (
+              <p className="mt-2 text-xs text-muted">Starts with: {selectedRole.abilities.map((a) => a.name).join(', ')}</p>
+            )}
           </fieldset>
 
           <div>

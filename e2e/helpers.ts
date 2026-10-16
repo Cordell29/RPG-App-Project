@@ -36,6 +36,11 @@ export async function quickCharacter(page: Page, opts: { role: string; name: str
   for (const [i, stat] of opts.order.entries()) {
     await creator.getByLabel(stat, { exact: true }).selectOption(values[i]!);
   }
+  // Pick the first N trained skills the role offers.
+  const legend = await creator.getByText(/Trained skills: pick \d/).textContent();
+  const count = Number(/pick (\d)/.exec(legend ?? '')?.[1] ?? 2);
+  const skills = creator.getByRole('group', { name: 'Skills' }).getByRole('button');
+  for (let i = 0; i < count; i++) await skills.nth(i).click();
   await creator.getByRole('button', { name: 'Create character' }).click();
   await expect(page.getByTestId('sheet-name').first()).toHaveText(opts.name);
 }

@@ -92,7 +92,7 @@ export function HostControls({ character: c, setting }: { character: Character; 
             [
               ['hpc', 'HP now', c.hp.current, 0, 999],
               ['hpm', 'HP max', c.hp.max, 1, 999],
-              ['ac', 'AC', c.ac, 1, 40],
+              ['ac', 'Base AC', c.ac, 1, 40],
               ['level', 'Level', c.level, 1, 20],
               ['gold', currency, c.gold, 0, 1e7],
               ['xp', 'XP', c.xp, 0, 1e7],
@@ -192,6 +192,79 @@ export function HostControls({ character: c, setting }: { character: Character; 
             ))}
           </ul>
         )}
+      </details>
+
+      <details>
+        <summary className="cursor-pointer text-sm font-semibold">Abilities, {setting?.slotsLabel?.toLowerCase() ?? 'spell slots'}{c.meters.spirit || c.meters.supply ? ' and meters' : ''}</summary>
+        <div className="mt-2 space-y-3 text-sm">
+          {c.abilities.length > 0 && (
+            <ul className="space-y-1">
+              {c.abilities.map((a) => (
+                <li key={a.id} className="flex items-center justify-between gap-2">
+                  <span className="truncate">
+                    {a.name}
+                    {a.uses ? ` (${a.uses.current}/${a.uses.max})` : ''}
+                  </span>
+                  <span className="flex gap-1">
+                    {a.uses && (
+                      <button
+                        type="button"
+                        className="btn px-2 py-0.5 text-xs"
+                        onClick={() => override({ kind: 'update_ability', characterId: c.id, abilityId: a.id, patch: { uses: { current: a.uses!.max, max: a.uses!.max } } }, `${a.name} restored`)}
+                      >
+                        Restore
+                      </button>
+                    )}
+                    <button type="button" className="btn px-2 py-0.5 text-xs" onClick={() => override({ kind: 'remove_ability', characterId: c.id, abilityId: a.id }, `Removed ${a.name}`)}>
+                      Remove
+                    </button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <form
+            key={c.spellSlots.map((x) => x.max).join()}
+            className="flex flex-wrap items-end gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const f = new FormData(e.currentTarget);
+              const max = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((l) => Number(f.get(`slot${l}`)) || 0);
+              const last = max.reduce((n, v, i) => (v > 0 ? i + 1 : n), 0);
+              void override(
+                { kind: 'spell_slots', characterId: c.id, slots: max.slice(0, last).map((m, i) => ({ max: m, current: Math.min(m, c.spellSlots[i]?.current ?? m) })) },
+                'Slots set',
+              );
+            }}
+          >
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((l) => (
+              <label key={l} className="w-11 text-center text-xs">
+                <span className="block text-muted">{l}</span>
+                <input name={`slot${l}`} type="number" min={0} max={9} className="field px-1 py-0.5 text-center" defaultValue={c.spellSlots[l - 1]?.max ?? 0} />
+              </label>
+            ))}
+            <button type="submit" className="btn px-2 py-1 text-xs">
+              Set max
+            </button>
+          </form>
+          {(['spirit', 'supply'] as const).map((m) =>
+            c.meters[m] ? (
+              <div key={m} className="flex items-center gap-2">
+                <span className="w-14 capitalize">{m}</span>
+                {[0, 1, 2, 3, 4, 5].map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    className={`btn px-2 py-0.5 text-xs ${c.meters[m]!.current === v ? 'btn-primary' : ''}`}
+                    onClick={() => override({ kind: 'meter', characterId: c.id, meter: m, current: v }, `${m} ${v}`)}
+                  >
+                    {v}
+                  </button>
+                ))}
+              </div>
+            ) : null,
+          )}
+        </div>
       </details>
 
       {status && (

@@ -54,6 +54,13 @@ export const api = {
       { description },
       creds.token,
     ),
+  draftAbility: (creds: Credentials, characterId: string, description: string) =>
+    request<{ name: string; description: string; uses?: number; recharge: 'at_will' | 'short_rest' | 'long_rest' }>(
+      'POST',
+      `/api/rooms/${encodeURIComponent(creds.roomId)}/ability-draft`,
+      { description, characterId },
+      creds.token,
+    ),
   claimHost: (roomId: string, hostToken: string) =>
     request<Credentials>('POST', `/api/rooms/${encodeURIComponent(roomId)}/claim-host`, { hostToken }),
 };

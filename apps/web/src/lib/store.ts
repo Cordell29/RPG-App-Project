@@ -7,6 +7,7 @@ import {
   type GameState,
   type RoomSettings,
   type ServerToClientEvents,
+  type TurnStatus,
   ClientLog,
   initialState,
 } from '@tavern/shared';
@@ -32,6 +33,11 @@ interface RoomStore {
   online: string[];
   /** A dice roll that arrived live (not during catch-up) and should animate. */
   liveRoll: EventOf<'dice_rolled'> | null;
+  turnStatus: TurnStatus;
+  /** Narration streaming in for the current turn (cleared when the narration event lands). */
+  streaming: { turnId: string; text: string } | null;
+  /** Seq of the latest narration that arrived live (read-aloud speaks these). */
+  liveNarrationSeq: number | null;
   connect: (creds: Credentials) => void;
   disconnect: () => void;
   send: (cmd: CommandBody) => Promise<CommandResult>;
@@ -61,6 +67,9 @@ export const useRoom = create<RoomStore>((set, get) => {
     isHost: false,
     online: [],
     liveRoll: null,
+    turnStatus: { status: 'idle' },
+    streaming: null,
+    liveNarrationSeq: null,
 
     connect(creds) {
       if (socket && get().creds?.token === creds.token) return;
@@ -86,7 +95,7 @@ export const useRoom = create<RoomStore>((set, get) => {
       });
       socket.on('sync', (msg) => {
         const gap = log.applySync(msg);
-        set({ settings: msg.settings, inviteCode: msg.inviteCode, isHost: msg.you.isHost, online: msg.online });
+        set({ settings: msg.settings, inviteCode: msg.inviteCode, isHost: msg.you.isHost, online: msg.online, turnStatus: msg.turnStatus });
         publish();
         if (gap !== null) resync(gap);
       });
@@ -98,10 +107,17 @@ export const useRoom = create<RoomStore>((set, get) => {
           .reverse()
           .find((e): e is EventOf<'dice_rolled'> => e.type === 'dice_rolled' && e.seq > before && e.seq <= log.lastSeq);
         if (roll) set({ liveRoll: roll });
+        const narration = events.find((e) => e.type === 'narration' && e.seq > before && e.seq <= log.lastSeq);
+        if (narration) set({ streaming: null, liveNarrationSeq: narration.seq });
         if (gap !== null) resync(gap);
       });
       socket.on('presence', ({ online }) => set({ online }));
       socket.on('settings', (settings) => set({ settings }));
+      socket.on('turn_status', (turnStatus) => set({ turnStatus }));
+      socket.on('narration_chunk', ({ turnId, delta }) => {
+        const cur = get().streaming;
+        set({ streaming: { turnId, text: (cur?.turnId === turnId ? cur.text : '') + delta } });
+      });
       // Test hook: lets the Playwright suite drop and restore this tab's connection.
       (window as unknown as { __tavern?: unknown }).__tavern = {
         drop: () => socket?.disconnect(),
@@ -114,7 +130,18 @@ export const useRoom = create<RoomStore>((set, get) => {
       socket?.disconnect();
       socket = null;
       log = new ClientLog();
-      set({ status: 'idle', creds: null, state: initialState(), events: [], settings: null, online: [], liveRoll: null });
+      set({
+        status: 'idle',
+        creds: null,
+        state: initialState(),
+        events: [],
+        settings: null,
+        online: [],
+        liveRoll: null,
+        turnStatus: { status: 'idle' },
+        streaming: null,
+        liveNarrationSeq: null,
+      });
     },
 
     /**

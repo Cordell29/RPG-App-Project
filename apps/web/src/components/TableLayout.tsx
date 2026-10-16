@@ -7,6 +7,7 @@ import { CharacterSheet } from './CharacterSheet.tsx';
 import { ChatPanel } from './ChatPanel.tsx';
 import { DicePanel } from './DicePanel.tsx';
 import { PartyPanel } from './PartyPanel.tsx';
+import { StoryPanel } from './StoryPanel.tsx';
 
 type Tab = 'story' | 'sheet' | 'dice' | 'party' | 'chat';
 type SideTab = Extract<Tab, 'sheet' | 'party' | 'chat'>;
@@ -26,22 +27,6 @@ function Icon({ tab }: { tab: Tab }) {
     <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       {ICONS[tab]}
     </svg>
-  );
-}
-
-function StoryPanel() {
-  const setting = useRoom((s) => s.state.setting);
-  return (
-    <section className="panel p-5" aria-labelledby="story-h">
-      <h2 id="story-h" className="heading text-xl">
-        The story
-      </h2>
-      <p className="mt-1 text-muted">{setting?.tone}</p>
-      <p className="mt-3 text-sm text-muted">
-        The AI Game Master arrives in the next build. For now, create your characters, chat and test the dice. Possible openings:
-      </p>
-      <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">{setting?.openingHooks.map((h) => <li key={h}>{h}</li>)}</ul>
-    </section>
   );
 }
 

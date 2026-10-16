@@ -15,7 +15,7 @@ test('characters live in the sidebar; host overrides reach players within a seco
   await quickCharacter(guest, { role: 'Rogue', name: 'Bram', order: ['Dexterity', 'Constitution', 'Wisdom', 'Intelligence', 'Charisma', 'Strength'] });
   const sheet = guest.getByTestId('character-sheet');
   await expect(sheet.getByTestId('sheet-hp')).toHaveText('12/12'); // 10 + CON 14 (+2)
-  await expect(sheet.getByTestId('sheet-ac')).toHaveText('12'); // 10 + DEX 15 (+2)
+  await expect(sheet.getByTestId('sheet-ac')).toHaveText('13'); // leather armour 11 + DEX 15 (+2)
   await expect(sheet.getByTestId('sheet-gold')).toHaveText('10');
   await expect(sheet.getByTestId('inventory')).toContainText("Thieves' tools");
   await expect(sheet.getByTestId('stat-dex')).toContainText('+2');
@@ -63,6 +63,7 @@ test('describe your own character, then edit the draft before creating', async (
   // The draft lands in the editable form with legal standard-array stats.
   await expect(creator.getByLabel('Name', { exact: true })).toHaveValue('Thorga');
   await expect(creator.getByLabel('Strength', { exact: true })).toHaveValue('15');
+  await expect(creator.getByRole('group', { name: 'Skills' }).getByRole('button', { pressed: true })).toHaveCount(2);
   await creator.getByLabel('Personal item name').fill("Brother's hammer");
   await creator.getByRole('button', { name: 'Create character' }).click();
   await expect(page.getByTestId('sheet-name')).toHaveText('Thorga');
@@ -92,7 +93,7 @@ test.describe('on a phone', () => {
 
     // No character yet, so the Sheet tab is open with the creator.
     await expect(nav.getByRole('tab', { name: 'Sheet' })).toHaveAttribute('aria-selected', 'true');
-    await quickCharacter(page, { role: 'Pilot', name: 'Vex', order: ['Reflex', 'Insight', 'Grit', 'Tech', 'Presence', 'Might'] });
+    await quickCharacter(page, { role: 'Pilot', name: 'Vex', order: ['Edge', 'Shadow', 'Grit', 'Wits', 'Heart', 'Iron'] });
 
     await nav.getByRole('tab', { name: 'Dice' }).click();
     await page.getByRole('button', { name: /^d20/ }).click();

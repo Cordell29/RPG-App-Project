@@ -138,7 +138,12 @@ export function SettingEditor({ value, onChange }: { value: SettingPreset; onCha
             type="button"
             className="btn"
             disabled={value.roles.length >= 8}
-            onClick={() => set('roles', [...value.roles, { name: 'New role', summary: 'Describe this role.', startingKit: [] }])}
+            onClick={() =>
+              set('roles', [
+                ...value.roles,
+                { name: 'New role', summary: 'Describe this role.', startingKit: [], skillChoices: [], skillCount: 2, saves: [], abilities: [], spellSlots: [] },
+              ])
+            }
           >
             + Add role
           </button>

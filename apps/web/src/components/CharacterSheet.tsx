@@ -1,9 +1,40 @@
-import { type Character, type SettingPreset, LIMITS, MAX_LEVEL, STAT_KEYS, XP_THRESHOLDS, statModifier } from '@tavern/shared';
+import {
+  type Character,
+  type SettingPreset,
+  LIMITS,
+  MAX_LEVEL,
+  SKILLS,
+  SKILL_KEYS,
+  STAT_KEYS,
+  XP_THRESHOLDS,
+  effectiveAc,
+  effectiveStats,
+  proficiencyBonus,
+  saveModifier,
+  skillLabel,
+  skillModifier,
+  statModifier,
+} from '@tavern/shared';
+import { effectText } from '../lib/items.ts';
+import { AbilityWorkshop } from './AbilityWorkshop.tsx';
 import { useState } from 'react';
 import { useRoom } from '../lib/store.ts';
 import { HostControls } from './HostControls.tsx';
 
 const fmtMod = (n: number) => (n >= 0 ? `+${n}` : `−${Math.abs(n)}`);
+
+function Pips({ current, max, label }: { current: number; max: number; label: string }) {
+  return (
+    <span className="inline-flex gap-0.5" role="meter" aria-label={label} aria-valuenow={current} aria-valuemin={0} aria-valuemax={max}>
+      {Array.from({ length: max }, (_, i) => (
+        <span key={i} className={`h-2.5 w-2.5 rounded-full border border-accent ${i < current ? 'bg-accent' : ''}`} />
+      ))}
+    </span>
+  );
+}
+
+const RECHARGE: Record<string, string> = { short_rest: 'short rest', long_rest: 'long rest', at_will: 'at will' };
+const ORD = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th'];
 
 function Bar({ value, max, tone, label }: { value: number; max: number; tone: 'hp' | 'xp'; label: string }) {
   const pct = max > 0 ? Math.max(0, Math.min(100, (value / max) * 100)) : 0;
@@ -50,6 +81,9 @@ export function CharacterSheet({ character: c, setting, canEdit }: { character: 
   const [draft, setDraft] = useState({ name: c.name, notes: c.notes, visualDescriptor: c.visualDescriptor });
   const [error, setError] = useState<string | null>(null);
   const [hostOpen, setHostOpen] = useState(false);
+  const [workshop, setWorkshop] = useState(false);
+  const eff = effectiveStats(c);
+  const pb = proficiencyBonus(c.level);
   const { next, prev } = vitals(c);
   const currency = setting?.currencyName ?? 'gold';
 
@@ -102,7 +136,7 @@ export function CharacterSheet({ character: c, setting, canEdit }: { character: 
         <div className="rounded-[var(--t-radius)] border border-line bg-raised p-2">
           <div className="label mb-0">AC</div>
           <div className="text-xl font-bold tabular-nums" data-testid="sheet-ac">
-            {c.ac}
+            {effectiveAc(c)}
           </div>
         </div>
         <div className="rounded-[var(--t-radius)] border border-line bg-raised p-2">
@@ -119,7 +153,21 @@ export function CharacterSheet({ character: c, setting, canEdit }: { character: 
           <span>{next === null ? 'Max level' : `Level ${c.level + 1} at ${next}`}</span>
         </div>
         <Bar value={next === null ? 1 : c.xp - prev} max={next === null ? 1 : next - prev} tone="xp" label="Experience" />
+        <p className="mt-1 text-xs text-muted">Proficiency bonus +{pb}</p>
       </div>
+
+      {(c.meters.spirit || c.meters.supply) && (
+        <div className="grid grid-cols-2 gap-2" data-testid="meters">
+          {(['spirit', 'supply'] as const).map((m) =>
+            c.meters[m] ? (
+              <div key={m} className="rounded-[var(--t-radius)] border border-line p-2 text-center">
+                <div className="label mb-1">{m === 'spirit' ? 'Spirit' : 'Supply'}</div>
+                <Pips current={c.meters[m]!.current} max={c.meters[m]!.max} label={m} />
+              </div>
+            ) : null,
+          )}
+        </div>
+      )}
 
       <section aria-label="Stats" className="grid grid-cols-3 gap-2">
         {STAT_KEYS.map((k) => (
@@ -127,11 +175,36 @@ export function CharacterSheet({ character: c, setting, canEdit }: { character: 
             <div className="truncate text-xs font-semibold text-muted" title={setting?.statLabels[k]}>
               {setting?.statLabels[k] ?? k.toUpperCase()}
             </div>
-            <div className="text-2xl font-bold tabular-nums">{fmtMod(statModifier(c.stats[k]))}</div>
-            <div className="text-xs tabular-nums text-muted">{c.stats[k]}</div>
+            <div className="text-2xl font-bold tabular-nums">{fmtMod(statModifier(eff[k]))}</div>
+            <div className="text-xs tabular-nums text-muted">
+              {eff[k]}
+              {eff[k] !== c.stats[k] ? '*' : ''}
+            </div>
+            <div className="text-[0.7rem] text-muted" title="Saving throw">
+              save {fmtMod(saveModifier(c, k))}
+              {c.proficiencies.saves.includes(k) ? ' ●' : ''}
+            </div>
           </div>
         ))}
       </section>
+
+      <details className="rounded-[var(--t-radius)] border border-line" open>
+        <summary className="cursor-pointer px-3 py-2 text-sm font-semibold">Skills</summary>
+        <ul className="grid grid-cols-1 gap-x-4 px-3 pb-2 text-sm sm:grid-cols-2" data-testid="skills">
+          {SKILL_KEYS.map((k) => {
+            const prof = c.proficiencies.skills.includes(k);
+            return (
+              <li key={k} className={`flex justify-between gap-2 ${prof ? 'font-semibold' : 'text-muted'}`}>
+                <span className="truncate">
+                  {prof ? '● ' : '○ '}
+                  {skillLabel(setting, k)} <span className="text-xs opacity-70">({setting?.statLabels[SKILLS[k]].slice(0, 3) ?? SKILLS[k]})</span>
+                </span>
+                <span className="tabular-nums">{fmtMod(skillModifier(c, k))}</span>
+              </li>
+            );
+          })}
+        </ul>
+      </details>
 
       {c.conditions.length > 0 && (
         <div className="flex flex-wrap gap-1.5" aria-label="Conditions">
@@ -142,6 +215,49 @@ export function CharacterSheet({ character: c, setting, canEdit }: { character: 
           ))}
         </div>
       )}
+
+      <section aria-labelledby={`abil-${c.id}`} className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h4 id={`abil-${c.id}`} className="label mb-0">
+            Abilities
+          </h4>
+          {canEdit && (
+            <button type="button" className="btn px-2 py-0.5 text-xs" aria-expanded={workshop} onClick={() => setWorkshop((w) => !w)}>
+              {workshop ? 'Close' : '+ Workshop'}
+            </button>
+          )}
+        </div>
+        {workshop && <AbilityWorkshop character={c} onDone={() => setWorkshop(false)} />}
+        {c.spellSlots.some((x) => x.max > 0) && (
+          <div className="flex flex-wrap items-center gap-3 text-sm" data-testid="spell-slots">
+            <span className="text-muted">{setting?.slotsLabel ?? 'Spell slots'}:</span>
+            {c.spellSlots.map((slot, i) =>
+              slot.max > 0 ? (
+                <span key={i} className="flex items-center gap-1">
+                  <span className="text-xs">{ORD[i]}</span>
+                  <Pips current={slot.current} max={slot.max} label={`${ORD[i]} level`} />
+                </span>
+              ) : null,
+            )}
+          </div>
+        )}
+        {c.abilities.length === 0 ? (
+          <p className="text-sm text-muted">None yet.</p>
+        ) : (
+          <ul className="space-y-2" data-testid="abilities">
+            {c.abilities.map((a) => (
+              <li key={a.id} className="rounded-[var(--t-radius)] border border-line p-2 text-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-semibold">{a.name}</span>
+                  {a.uses && <Pips current={a.uses.current} max={a.uses.max} label={`${a.name} uses`} />}
+                  <span className="text-xs text-muted">{RECHARGE[a.recharge]}</span>
+                </div>
+                <p className="text-xs text-muted">{a.description}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <section aria-labelledby={`inv-${c.id}`}>
         <h4 id={`inv-${c.id}`} className="label">
@@ -157,6 +273,8 @@ export function CharacterSheet({ character: c, setting, canEdit }: { character: 
                   <span className="font-semibold">{item.name}</span>
                   {item.qty > 1 && <span className="text-muted"> ×{item.qty}</span>}
                   {item.equipped && <span className="ml-1.5 rounded bg-accent px-1.5 text-xs text-accent-ink">equipped</span>}
+                  {item.effects && <p className="text-xs font-semibold text-accent">{effectText(item, setting)}</p>}
+                  {item.rarity && item.rarity !== 'mundane' && <span className="ml-1 text-xs capitalize text-accent-2">{item.rarity.replace('_', ' ')}</span>}
                   {item.notes && <p className="text-xs text-muted">{item.notes}</p>}
                   {item.tags.length > 0 && <p className="text-[0.7rem] uppercase tracking-wide text-muted">{item.tags.join(' · ')}</p>}
                 </div>
