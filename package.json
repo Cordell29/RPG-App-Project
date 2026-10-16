@@ -3,12 +3,18 @@
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.28.0",
-  "engines": { "node": ">=22.18" },
+  "engines": {
+    "node": ">=22.18"
+  },
   "scripts": {
     "test": "pnpm -r --stream test",
-    "typecheck": "pnpm -r --stream typecheck"
+    "typecheck": "pnpm -r --stream typecheck",
+    "e2e": "playwright test",
+    "dev": "pnpm -r --parallel --filter @tavern/server --filter @tavern/web dev",
+    "build": "pnpm --filter @tavern/web build"
   },
   "devDependencies": {
+    "@playwright/test": "1.56.1",
     "@types/node": "^22.19.0",
     "typescript": "^5.9.3",
     "vitest": "^5.0.5"

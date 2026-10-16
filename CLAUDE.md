@@ -1,6 +1,6 @@
 # Tavern — notes for Claude Code
 
-The full brief is in [docs/SPEC.md](docs/SPEC.md). Read it before changing anything.
+The full brief is in [docs/SPEC.md](docs/SPEC.md). Read it before changing anything; Addendum A at the end records the host's later decisions and overrides the brief where they conflict.
 
 ## Non-negotiables
 
@@ -25,5 +25,7 @@ The full brief is in [docs/SPEC.md](docs/SPEC.md). Read it before changing anyth
 
 ## Commands
 
-- `pnpm install` · `pnpm test` · `pnpm typecheck`
+- `pnpm install` · `pnpm test` · `pnpm typecheck` · `pnpm e2e` (Playwright, builds the web app first)
+- `pnpm dev` runs server (:3000) and Vite (:5173) with mock LLM unless `ANTHROPIC_API_KEY` is set in `.env`
+- Playwright is pinned to 1.56.1 to match the pre-installed Chromium.
 - Relative imports use explicit `.ts` extensions (Node runs TypeScript via type stripping).

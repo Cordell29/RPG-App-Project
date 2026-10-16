@@ -17,6 +17,10 @@ export const RoleSchema = z.object({
   startingKit: z.array(z.string().trim().min(1).max(80)).max(12),
 });
 
+export const THEMES = ['parchment', 'neon', 'neutral'] as const;
+export const ThemeSchema = z.enum(THEMES);
+export type Theme = z.infer<typeof ThemeSchema>;
+
 /** Display-only flavour for a campaign. Internal field names (gold, str, …) never change. */
 export const SettingPresetSchema = z.object({
   key: z.string().regex(/^[a-z0-9_-]{1,40}$/),
@@ -28,6 +32,8 @@ export const SettingPresetSchema = z.object({
   openingHooks: z.array(z.string().trim().min(1).max(500)).length(3),
   artStyle: z.string().trim().min(1).max(1000),
   contentNotes: z.string().max(1000).optional(),
+  /** Visual theme for the web app. CSS only; no effect on rules. */
+  theme: ThemeSchema.default('neutral'),
 });
 
 export type SettingPreset = z.infer<typeof SettingPresetSchema>;

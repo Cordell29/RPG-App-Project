@@ -427,3 +427,58 @@ Eight phases, each ending in a playable or testable state. Do not start a phase 
 - **Settings:** host chooses Fantasy, Sci-fi or Describe your own, on one shared rules engine (see Campaign settings).
 - **Art:** painterly character art in the tradition of modern RPG rulebooks (see Image generation).
 - **Hosting:** Cloudflare Quick Tunnel for now, no domain; named tunnel later if a domain is bought (see Hosting).
+
+## Addendum A — host feedback after Phase 1 (2026-10-16)
+
+These decisions extend or override the brief above. Where they conflict, this addendum wins.
+
+### A1. "Describe your own" everywhere, with quick options
+
+Every creative input offers quick options **and** a free-text "Describe your own" path:
+
+| Thing | Quick options | Describe your own | Phase |
+|---|---|---|---|
+| Setting | Fantasy, Sci-fi presets | Haiku drafts a SettingPreset; host edits, confirms | 2 |
+| Character | Pick a role from the preset, roll or standard-array stats, random name | Player describes the character; Haiku drafts a sheet **inside the rules** (stats from the standard array / point-buy, starting kit from role, level 1); player edits; server validates | 3 |
+| Items | Role starting kit | Player describes a personal item; drafted as flavour (name, tags, notes) with no mechanical bonus; host can approve or edit | 3 |
+| Player actions | 3 GM-suggested actions after each narration (clickable chips) | Free text (always available) | 4 |
+
+AI drafts are always proposals: they pass through the same zod validation and caps as GM deltas, and nothing is saved until a person confirms.
+
+### A2. Story backup and session recaps
+
+- **Sessions.** The host presses Start session / End session. New event types `session_started` and `session_ended` (payload: session number) mark the boundaries.
+- **Story so far.** A reader view lists every narration in order, grouped by session, with player actions inline. Available any time. (Phase 4)
+- **Session recap.** At End session (or on demand), Haiku writes a "Previously on…" recap from that session's raw events (same facts-only rules as the chronicle). Recaps are stored immutably and shown at the next session start. (Phase 5)
+- **Story export.** One button downloads the whole story as Markdown (readable, printable) in addition to the JSON campaign export. Both are included in nightly backups' scope. (Phase 7)
+
+### A3. Themes
+
+`SettingPreset` gains `theme: 'parchment' | 'neon' | 'neutral'`. Fantasy → parchment, Sci-fi → neon, custom settings default to neutral (host can pick any). Themes are CSS variables only; layout is shared. (Phase 2)
+
+### A4. Dice
+
+Quick-roll buttons d4, d6, d8, d10, d12, d20, d100 with a dice-count stepper, a modifier, and advantage/disadvantage for d20; plus a custom notation box (`3d6+2`, `2d8+1d4-1`, `1d20+5 adv`). (Phase 2)
+
+### A5. Chat
+
+Basic out-of-character chat only. In-character speech goes in action prompts. (Phase 2)
+
+### A6. Invite code instead of passphrase
+
+Each room gets a short invite code (e.g. `K7QM-P3XA`, unambiguous alphabet) alongside the share link. Anyone with the link or code can join with a display name. No passphrase. (Phase 2)
+
+### A7. Narration read aloud (overrides "voice" non-goal, output only)
+
+Voice *input* stays out of scope. Narration can be read aloud:
+- **Default: browser speech** (Web Speech API) — free, offline, quality varies by device. Each player toggles it and picks a voice locally.
+- **Optional: AI voice** (Gemini TTS through the existing `GEMINI_API_KEY`, model in `GEMINI_TTS_MODEL`) — generated once on the server per narration, cached as an audio asset, counted against spend caps, behind a `TtsProvider` interface with a mock. Host toggles it per room.
+- A ▶ button on every narration replays it. (Browser speech: Phase 4. AI voice: Phase 6.)
+
+### A8. Solo or group play, and turn modes
+
+- Room **mode**: `solo` (no invite UI; every action resolves immediately) or `group` (invite code shown). A solo room can be switched to group later. (Phase 2)
+- **Turn modes** (room setting, host can change between turns; Phase 4):
+  - **Round (default).** Everyone writes an action; submitted actions are visible to the table and editable until the round resolves; the round resolves when all active players have acted, after the timer (default 60 s in group, off in solo), or when the host presses Resolve. The GM resolves all actions together in one call, so it can reconcile overlapping or contradictory actions in a single coherent outcome.
+  - **Spotlight.** Strict rotation: only the player in the spotlight can submit; the GM resolves that one action, then the spotlight passes. Good for big decisions or when players keep talking over each other.
+- New event types: `action_edited`, `action_withdrawn` (Round mode edits before resolve).

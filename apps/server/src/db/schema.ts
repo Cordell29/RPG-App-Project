@@ -1,17 +1,22 @@
-import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 // Typed mirror of migrations/*.sql for Drizzle queries.
 // test/db.test.ts fails if the two drift apart.
 
-export const rooms = sqliteTable('rooms', {
-  id: text('id').primaryKey(),
-  name: text('name').notNull(),
-  hostTokenHash: text('host_token_hash').notNull(),
-  settingsJson: text('settings_json').notNull().default('{}'),
-  spendCents: integer('spend_cents').notNull().default(0),
-  spendCapCents: integer('spend_cap_cents').notNull().default(500),
-  createdAt: text('created_at').notNull(),
-});
+export const rooms = sqliteTable(
+  'rooms',
+  {
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    inviteCode: text('invite_code'),
+    hostTokenHash: text('host_token_hash').notNull(),
+    settingsJson: text('settings_json').notNull().default('{}'),
+    spendCents: integer('spend_cents').notNull().default(0),
+    spendCapCents: integer('spend_cap_cents').notNull().default(500),
+    createdAt: text('created_at').notNull(),
+  },
+  (t) => [uniqueIndex('rooms_invite_code_idx').on(t.inviteCode)],
+);
 
 export const players = sqliteTable(
   'players',

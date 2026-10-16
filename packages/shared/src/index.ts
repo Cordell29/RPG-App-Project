@@ -6,3 +6,7 @@ export * from './deltas.ts';
 export * from './events.ts';
 export * from './reducer.ts';
 export * from './presets.ts';
+export * from './dice.ts';
+export * from './room.ts';
+export * from './protocol.ts';
+export * from './syncClient.ts';
