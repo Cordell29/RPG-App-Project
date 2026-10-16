@@ -37,6 +37,7 @@ export async function draftAbility(
   character: Character | null,
   idea: string,
   rulesLookup = true,
+  roomId?: string,
 ): Promise<AbilityDraft> {
   const text = idea.trim();
   if (text.length < 3) throw new LLMError('Describe the ability first.');
@@ -57,6 +58,7 @@ ${RULES_REFERENCE}`;
   const messages: LlmMessage[] = [{ role: 'user', content: `<idea>\n${text.replace(/<\/?idea>/gi, '')}\n</idea>` }];
   for (let i = 0; i < 4; i++) {
     const resp = await llm.chat({
+      ...(roomId ? { roomId } : {}),
       purpose: 'ability_draft',
       tier: 'turn',
       system: [{ text: system, cache: false }],

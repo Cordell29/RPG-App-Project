@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { type RoomSummary, api } from '../lib/api.ts';
 import { navigate, setTheme } from '../lib/router.ts';
 import { loadCreds, saveCreds } from '../lib/storage.ts';
+import { RejoinPanel } from '../components/RejoinPanel.tsx';
 
 /** /join/:code (invite code) or /join?room=:id (opened a room link without a seat). */
 export function Join({ code, roomId }: { code: string | null; roomId: string | null }) {
@@ -106,6 +107,7 @@ export function Join({ code, roomId }: { code: string | null; roomId: string | n
           )}
         </form>
       )}
+      {summary && <RejoinPanel roomId={summary.roomId} />}
       {error && (
         <p className="text-sm text-bad" role="alert">
           {error}

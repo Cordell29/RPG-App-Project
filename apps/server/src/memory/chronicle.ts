@@ -159,6 +159,7 @@ export class Chronicler {
 
     const { data } = await this.llm.structured({
       purpose: 'chronicle_chapter',
+      roomId,
       tier: 'summary',
       system: CHAPTER_SYSTEM,
       prompt: `<transcript>\n${transcript}\n</transcript>`,
@@ -205,6 +206,7 @@ export class Chronicler {
     const batch = open.slice(0, CHAPTERS_PER_ARC);
     const { data } = await this.llm.structured({
       purpose: 'chronicle_arc',
+      roomId,
       tier: 'summary',
       system: ARC_SYSTEM,
       prompt: batch.map((c) => `<chapter n="${c.chapterNo}">\n${c.summary}\n</chapter>`).join('\n'),
@@ -239,6 +241,7 @@ export class Chronicler {
     if (turnIds.size === 0) return;
     const { data } = await this.llm.structured({
       purpose: 'session_recap',
+      roomId,
       tier: 'summary',
       system: RECAP_SYSTEM,
       prompt: `<transcript>\n${transcriptOf(events, state, turnIds, start, end)}\n</transcript>`,

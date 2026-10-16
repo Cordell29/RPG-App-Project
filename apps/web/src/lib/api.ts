@@ -84,6 +84,16 @@ export const api = {
     const filename = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') ?? '')?.[1] ?? 'campaign.tavern.json';
     return { blob: await res.blob(), filename };
   },
+  seats: (roomId: string) => request<{ characterId: string; characterName: string; playerName: string }[]>('GET', `/api/rooms/${encodeURIComponent(roomId)}/seats`),
+  requestRejoin: (roomId: string, characterId: string) =>
+    request<{ requestId: string; secret: string }>('POST', `/api/rooms/${encodeURIComponent(roomId)}/rejoin`, { characterId }),
+  rejoinStatus: (roomId: string, requestId: string, secret: string) =>
+    request<{ status: 'pending' | 'approved' | 'denied'; creds?: Credentials }>(
+      'GET',
+      `/api/rooms/${encodeURIComponent(roomId)}/rejoin/${encodeURIComponent(requestId)}?secret=${encodeURIComponent(secret)}`,
+    ),
+  spend: (creds: Credentials) =>
+    request<{ roomTodayUsd: number; roomCapUsd: number; globalTodayUsd: number; globalCapUsd: number }>('GET', `/api/rooms/${encodeURIComponent(creds.roomId)}/spend`, undefined, creds.token),
   claimHost: (roomId: string, hostToken: string) =>
     request<Credentials>('POST', `/api/rooms/${encodeURIComponent(roomId)}/claim-host`, { hostToken }),
 };

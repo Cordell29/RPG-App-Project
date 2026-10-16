@@ -12,7 +12,7 @@ const fighter: CharacterCreateInput = {
 
 async function setup() {
   const llm = devMockProvider();
-  const t = await buildApp({ dataDir: tmpDir(), db: testDb(), llm, rulesLookup: false });
+  const t = await buildApp({ dataDir: tmpDir(), db: testDb(), llm, rulesLookup: false, turnsPerMinute: 100_000 });
   const room = t.rooms.createRoom({ roomName: 'C', hostName: 'H', setting: getPreset('fantasy')!, mode: 'solo' });
   const player = t.rooms.authenticate(room.roomId, room.token)!;
   let n = 0;

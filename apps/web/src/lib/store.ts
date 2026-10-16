@@ -5,6 +5,7 @@ import {
   type EventOf,
   type GameEvent,
   type GameState,
+  type RejoinRequestInfo,
   type RoomSettings,
   type ServerToClientEvents,
   type TurnStatus,
@@ -38,6 +39,10 @@ interface RoomStore {
   streaming: { turnId: string; text: string } | null;
   /** Seq of the latest narration that arrived live (read-aloud speaks these). */
   liveNarrationSeq: number | null;
+  /** The server's public address (tunnel), if known. */
+  publicUrl: string | null;
+  /** Host only: returning players waiting to be let back in. */
+  rejoinRequests: RejoinRequestInfo[];
   connect: (creds: Credentials) => void;
   disconnect: () => void;
   send: (cmd: CommandBody) => Promise<CommandResult>;
@@ -70,6 +75,8 @@ export const useRoom = create<RoomStore>((set, get) => {
     turnStatus: { status: 'idle' },
     streaming: null,
     liveNarrationSeq: null,
+    publicUrl: null,
+    rejoinRequests: [],
 
     connect(creds) {
       if (socket && get().creds?.token === creds.token) return;
@@ -95,7 +102,15 @@ export const useRoom = create<RoomStore>((set, get) => {
       });
       socket.on('sync', (msg) => {
         const gap = log.applySync(msg);
-        set({ settings: msg.settings, inviteCode: msg.inviteCode, isHost: msg.you.isHost, online: msg.online, turnStatus: msg.turnStatus });
+        set({
+          settings: msg.settings,
+          inviteCode: msg.inviteCode,
+          isHost: msg.you.isHost,
+          online: msg.online,
+          turnStatus: msg.turnStatus,
+          publicUrl: msg.publicUrl ?? null,
+          rejoinRequests: msg.rejoinRequests ?? [],
+        });
         publish();
         if (gap !== null) resync(gap);
       });
@@ -114,6 +129,8 @@ export const useRoom = create<RoomStore>((set, get) => {
       socket.on('presence', ({ online }) => set({ online }));
       socket.on('settings', (settings) => set({ settings }));
       socket.on('turn_status', (turnStatus) => set({ turnStatus }));
+      socket.on('public_url', ({ url }) => set({ publicUrl: url }));
+      socket.on('rejoin_requests', (rejoinRequests) => set({ rejoinRequests }));
       // The host rebuilt state on the server: start over from seq 0.
       socket.on('reset', () => {
         log = new ClientLog();
@@ -147,6 +164,8 @@ export const useRoom = create<RoomStore>((set, get) => {
         turnStatus: { status: 'idle' },
         streaming: null,
         liveNarrationSeq: null,
+        publicUrl: null,
+        rejoinRequests: [],
       });
     },
 

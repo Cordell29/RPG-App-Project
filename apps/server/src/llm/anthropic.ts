@@ -55,6 +55,7 @@ export class AnthropicProvider implements LLMProvider {
         outputTokens: response.usage.output_tokens,
         cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
         cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0,
+        model,
       },
     };
   }
@@ -113,6 +114,8 @@ export class AnthropicProvider implements LLMProvider {
         outputTokens: msg.usage.output_tokens,
         cacheReadTokens: msg.usage.cache_read_input_tokens ?? 0,
         cacheWriteTokens: msg.usage.cache_creation_input_tokens ?? 0,
+        model: msg.model,
+        webSearches: msg.usage.server_tool_use?.web_search_requests ?? 0,
       },
     };
   }

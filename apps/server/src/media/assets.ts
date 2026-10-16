@@ -32,6 +32,8 @@ export interface AssetServiceDeps {
   tts: TtsProvider;
   settings: (roomId: string) => RoomSettings;
   onEvents: (roomId: string, events: GameEvent[]) => void;
+  /** Spend caps: checked before each generation; costs are recorded here. */
+  spend?: { check(roomId: string): { ok: true } | { ok: false; message: string }; record(roomId: string, category: string, usd: number): void } | null;
   /** Delay before retry n (1-based). Tests pass () => 0. */
   backoffMs?: (attempt: number) => number;
   timeoutMs?: number;
@@ -68,7 +70,7 @@ export class AssetService {
   private readonly controllers = new Set<AbortController>();
 
   constructor(deps: AssetServiceDeps) {
-    this.d = { backoffMs: (n) => 1000 * 4 ** (n - 1), timeoutMs: 90_000, ...deps };
+    this.d = { backoffMs: (n) => 1000 * 4 ** (n - 1), timeoutMs: 90_000, spend: null, ...deps };
   }
 
   dir(roomId: string) {
@@ -178,8 +180,22 @@ export class AssetService {
 
   // ── the worker ──────────────────────────────────────────────────────────
 
+  /** Null if the room may spend on media now, else the reason it may not. */
+  budgetBlock(roomId: string): string | null {
+    const c = this.d.spend?.check(roomId);
+    return c && !c.ok ? c.message : null;
+  }
+
   private async process(id: string) {
     let row = this.d.db.select().from(assets).where(eq(assets.id, id)).get();
+    if (row && row.status === 'pending' && !this.stopped) {
+      const blocked = this.budgetBlock(row.roomId);
+      if (blocked) {
+        this.d.db.update(assets).set({ status: 'failed', error: blocked.slice(0, 300) }).where(eq(assets.id, id)).run();
+        if (row.kind !== 'voice') this.commit(row.roomId, [{ type: 'image_failed', actorId: null, turnId: null, payload: { assetId: id, reason: blocked.slice(0, 300) } }]);
+        return;
+      }
+    }
     while (row && row.status === 'pending' && !this.stopped) {
       try {
         await this.generate(row);
@@ -249,6 +265,7 @@ export class AssetService {
       this.d.db.update(assets).set({ status: 'ready', path, costCents: cents, error: null }).where(eq(assets.id, row.id)).run();
       this.d.db.update(rooms).set({ spendCents: sql`${rooms.spendCents} + ${cents}` }).where(eq(rooms.id, row.roomId)).run();
     })();
+    this.d.spend?.record(row.roomId, row.kind === 'voice' ? 'voice' : 'image', cents / 100);
   }
 
   private commit(roomId: string, drafts: EventDraft[]) {

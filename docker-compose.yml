@@ -1,0 +1,32 @@
+# Tavern on your PC: the app plus a Cloudflare Quick Tunnel.
+# The app publishes NO ports; friends reach it only through the tunnel's https address.
+#   Start / update:  docker compose up -d --build
+#   Public link:     docker compose logs cloudflared | grep trycloudflare   (also shown to the host in the app)
+services:
+  app:
+    build: .
+    env_file: .env
+    environment:
+      DATA_DIR: /data
+      TUNNEL_METRICS_URL: http://cloudflared:2000/quicktunnel
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+    mem_limit: 1g
+    user: "1000:1000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+
+  cloudflared:
+    image: cloudflare/cloudflared:2026.9.0
+    # Quick Tunnel: no account or domain needed. For a named tunnel (own domain) replace this
+    # command with:  tunnel --no-autoupdate run   and set TUNNEL_TOKEN in .env.
+    command: tunnel --no-autoupdate --metrics 0.0.0.0:2000 --url http://app:3000
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy

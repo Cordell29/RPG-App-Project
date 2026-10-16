@@ -27,5 +27,7 @@ The full brief is in [docs/SPEC.md](docs/SPEC.md). Read it before changing anyth
 
 - `pnpm install` · `pnpm test` · `pnpm typecheck` · `pnpm e2e` (Playwright, builds the web app first)
 - `pnpm dev` runs server (:3000) and Vite (:5173) with mock LLM unless `ANTHROPIC_API_KEY` is set in `.env`
+- `pnpm check:bundle` scans the built web bundle for API keys (also runs in the Docker build and `pnpm e2e`).
+- Deploy: `docker compose up -d --build` (see docs/DEPLOY.md).
 - Playwright is pinned to 1.56.1 to match the pre-installed Chromium.
 - Relative imports use explicit `.ts` extensions (Node runs TypeScript via type stripping).

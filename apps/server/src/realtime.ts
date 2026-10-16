@@ -12,6 +12,7 @@ import {
 import { Server, type Socket } from 'socket.io';
 import type { CommandBus } from './commands.ts';
 import type { EventStore } from './db/eventStore.ts';
+import { RateLimiter } from './limits.ts';
 import type { AuthedPlayer, RoomService } from './rooms.ts';
 
 type SocketData = { player: AuthedPlayer };
@@ -31,11 +32,16 @@ export function attachRealtime(
     turnStatus: (roomId: string) => TurnStatus;
     /** Extra work for every committed batch (e.g. queueing media jobs). */
     afterPublish?: (roomId: string, events: GameEvent[]) => void;
+    /** Extra fields for the sync message (public link; rejoin requests for the host). */
+    extraSync?: (player: AuthedPlayer) => Partial<SyncMessage>;
+    /** Commands per player per minute (default 30). */
+    commandsPerMinute?: number;
   },
 ): TavernIo {
   const { rooms, store, commands } = deps;
   const io: TavernIo = new Server(httpServer, { serveClient: false, cors: { origin: false } });
   const online = new Map<string, Map<string, number>>(); // roomId → playerId → socket count
+  const commandLimit = new RateLimiter(deps.commandsPerMinute ?? 30, 60_000);
 
   const broadcast = (roomId: string, events: GameEvent[]) => {
     if (!events.length) return;
@@ -59,6 +65,7 @@ export function attachRealtime(
       you: { playerId: player.playerId, isHost: player.isHost },
       online: onlineIds(player.roomId),
       turnStatus: deps.turnStatus(player.roomId),
+      ...deps.extraSync?.(player),
     };
     let msg: SyncMessage;
     if (fromSeq > state.seq) {
@@ -106,6 +113,8 @@ export function attachRealtime(
 
     socket.on('command', (cmd, ack) => {
       if (typeof ack !== 'function') return;
+      const wait = commandLimit.hit(player.playerId);
+      if (wait) return ack({ ok: false, error: `Slow down a little: try again in ${Math.ceil(wait / 1000)} s.` });
       try {
         ack(commands.execute(player, cmd));
       } catch (err) {

@@ -47,6 +47,10 @@ export interface TurnRunnerDeps {
   rulesLookup?: boolean;
   /** Long-term memory: chronicle, canon and recaps. */
   memory?: Chronicler;
+  /** Spend caps: may a new GM turn start in this room? */
+  gate?: (roomId: string) => { ok: true } | { ok: false; message: string };
+  /** At most this many GM turns per room per minute (default 6). */
+  turnsPerMinute?: number;
   /** What illustrations the GM may request this turn. */
   imageQuota?: (roomId: string, state: GameState, events: GameEvent[]) => { remainingToday: number; sceneAllowed: boolean };
 }
@@ -60,7 +64,9 @@ export interface TurnRunnerDeps {
  * commit leaves nothing behind; actions stay queued and the host can retry.
  */
 export class TurnRunner {
-  private readonly d: Required<Omit<TurnRunnerDeps, 'random' | 'newId' | 'timeoutMs' | 'rulesLookup' | 'memory' | 'imageQuota'>> & {
+  private readonly d: Required<Omit<TurnRunnerDeps, 'random' | 'newId' | 'timeoutMs' | 'rulesLookup' | 'memory' | 'imageQuota' | 'gate' | 'turnsPerMinute'>> & {
+    gate: TurnRunnerDeps['gate'] | null;
+    turnsPerMinute: number;
     memory: Chronicler | null;
     imageQuota: TurnRunnerDeps['imageQuota'] | null;
     random: RandomInt;
@@ -75,11 +81,13 @@ export class TurnRunner {
   private readonly held = new Set<string>();
   /** Adjudication calls started per room (tests assert "exactly one GM call"). */
   readonly gmTurns = new Map<string, number>();
+  /** Start times of recent GM turns per room (turn-rate limit). */
+  private readonly recentStarts = new Map<string, number[]>();
   /** Token budget report of the most recent GM prompt per room. */
   readonly lastBudget = new Map<string, BudgetReport>();
 
   constructor(deps: TurnRunnerDeps) {
-    this.d = { random: randomInt, newId: defaultNewId, timeoutMs: 60_000, rulesLookup: true, memory: null, imageQuota: null, ...deps };
+    this.d = { random: randomInt, newId: defaultNewId, timeoutMs: 60_000, rulesLookup: true, memory: null, imageQuota: null, gate: null, turnsPerMinute: 6, ...deps };
   }
 
   status(roomId: string): TurnStatus {
@@ -218,7 +226,40 @@ export class TurnRunner {
       settings.turnMode === 'spotlight' && settings.mode !== 'solo' && state.spotlight
         ? state.turn.pending.filter((a) => a.playerId === state.spotlight)
         : state.turn.pending;
-    if (pending.length === 0) return;
+    if (pending.length === 0) {
+      if (this.status(roomId).status === 'paused') this.setStatus(roomId, { status: 'idle' });
+      return;
+    }
+
+    // Spend cap: pause cleanly before any AI call; actions stay queued for when it resets.
+    const gate = this.d.gate?.(roomId);
+    if (gate && !gate.ok) {
+      this.held.add(roomId);
+      this.clearTimer(roomId);
+      this.setStatus(roomId, { status: 'paused', error: gate.message });
+      return;
+    }
+    // Turn-rate limit: wait for the window instead of refusing.
+    const now = Date.now();
+    const starts = (this.recentStarts.get(roomId) ?? []).filter((t) => now - t < 60_000);
+    if (starts.length >= this.d.turnsPerMinute) {
+      const wait = 60_000 - (now - starts[0]!) + 50;
+      this.setStatus(roomId, { status: 'paused', error: `The GM takes at most ${this.d.turnsPerMinute} turns a minute; resuming in ${Math.ceil(wait / 1000)} s.` });
+      // Hold the room so the post-job poke doesn't immediately retry and cancel this timer.
+      this.held.add(roomId);
+      this.clearTimer(roomId);
+      this.timers.set(
+        roomId,
+        setTimeout(() => {
+          this.timers.delete(roomId);
+          this.held.delete(roomId);
+          this.start(roomId);
+        }, wait),
+      );
+      return;
+    }
+    starts.push(now);
+    this.recentStarts.set(roomId, starts);
 
     const turnId = this.d.newId();
     const actions: TurnAction[] = pending.map((a) => ({ playerId: a.playerId, characterId: a.characterId, text: a.text }));
@@ -247,6 +288,7 @@ export class TurnRunner {
         const resp = await this.withTimeout((signal) =>
           this.d.llm.chat({
             purpose: 'gm_adjudicate',
+            roomId,
             tier: 'turn',
             system: prompt.system,
             messages,
@@ -300,7 +342,7 @@ export class TurnRunner {
       let sent = 0;
       const resp = await this.withTimeout((signal) =>
         this.d.llm.streamText(
-          { purpose: 'gm_narrate', tier: 'turn', system: [{ text: prompt.system, cache: true }], messages: [{ role: 'user', content: prompt.user }], effort: 'low', maxTokens: 2000, signal },
+          { purpose: 'gm_narrate', roomId, tier: 'turn', system: [{ text: prompt.system, cache: true }], messages: [{ role: 'user', content: prompt.user }], effort: 'low', maxTokens: 2000, signal },
           (delta) => {
             raw += delta;
             const visible = visibleNarration(raw);

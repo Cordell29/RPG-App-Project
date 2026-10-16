@@ -43,6 +43,8 @@ export interface TurnHooks {
 export interface MediaHooks {
   quota(roomId: string, state: GameState, events: GameEvent[]): { remainingToday: number; sceneAllowed: boolean };
   portraitsThisSession(events: GameEvent[], characterId: string): number;
+  /** Null if the room may spend on images now, else why not. */
+  budgetBlock(roomId: string): string | null;
   /** Re-queues images whose files are missing; returns how many. */
   repaintMissing(roomId: string): number;
 }
@@ -52,6 +54,10 @@ export interface MemoryHooks {
   syncCanon(roomId: string): void;
   /** Rewrites the chapter and canon tables from the event log. */
   rebuildDerived(roomId: string): void;
+}
+
+export interface RejoinHooks {
+  resolve(roomId: string, requestId: string, approve: boolean): void;
 }
 
 class CommandRejected extends Error {}
@@ -76,6 +82,7 @@ export class CommandBus {
   turns: TurnHooks | null = null;
   memory: MemoryHooks | null = null;
   media: MediaHooks | null = null;
+  rejoin: RejoinHooks | null = null;
 
   constructor(db: Db, store: EventStore, random: RandomInt = randomInt) {
     this.db = db;
@@ -113,6 +120,17 @@ export class CommandBus {
       try {
         if (cmd.type === 'set_room_mode') {
           newSettings = this.setMode(player.roomId, { mode: cmd.mode });
+        } else if (cmd.type === 'resolve_rejoin') {
+          if (!this.rejoin) reject('Rejoining is not available.');
+          try {
+            this.rejoin!.resolve(player.roomId, cmd.requestId, cmd.approve);
+          } catch (err) {
+            reject((err as Error).message);
+          }
+        } else if (cmd.type === 'set_spend_cap') {
+          this.db.update(rooms).set({ spendCapCents: Math.round(cmd.usd * 100) }).where(eq(rooms.id, player.roomId)).run();
+          // A raised cap lets a paused GM carry on with whatever is queued.
+          this.after.push(() => this.turns?.resolveNow(player.roomId));
         } else if (cmd.type === 'rebuild_state') {
           if (this.turns && this.turns.status(player.roomId).status !== 'idle' && this.turns.status(player.roomId).status !== 'failed') {
             reject('Wait for the GM to finish the current turn.');
@@ -180,7 +198,7 @@ export class CommandBus {
     return next;
   }
 
-  private toEvents(player: AuthedPlayer, cmd: Exclude<Command, { type: 'set_room_mode' | 'set_turn_mode' | 'set_ai_voice' | 'rebuild_state' }>): EventDraft[] {
+  private toEvents(player: AuthedPlayer, cmd: Exclude<Command, { type: 'set_room_mode' | 'set_turn_mode' | 'set_ai_voice' | 'rebuild_state' | 'set_spend_cap' | 'resolve_rejoin' }>): EventDraft[] {
     const base = { actorId: player.playerId, turnId: null };
     const state = this.store.getState(player.roomId);
     const me = state.players.find((p) => p.id === player.playerId);
@@ -372,6 +390,8 @@ export class CommandBus {
         if (!this.media) reject('Images are not available.');
         const events = this.store.loadEvents(player.roomId);
         if (this.media!.quota(player.roomId, state, events).remainingToday <= 0) reject("Today's image limit for this room is used up.");
+        const blocked = this.media!.budgetBlock(player.roomId);
+        if (blocked) reject(blocked);
         if (cmd.kind === 'scene') {
           if (!player.isHost) reject('Only the host can do that.');
           return [{ ...base, type: 'image_requested', payload: { assetId: newId(), kind: 'scene', subject: state.scene.title || state.scene.locationKey } }];

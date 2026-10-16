@@ -9,6 +9,10 @@ export interface Usage {
   outputTokens: number;
   cacheReadTokens?: number;
   cacheWriteTokens?: number;
+  /** Model that served the call (for pricing). */
+  model?: string;
+  /** Server-side web searches used (billed per search). */
+  webSearches?: number;
 }
 
 export type LLMPurpose =
@@ -25,6 +29,8 @@ export type Tier = 'summary' | 'turn';
 export interface StructuredRequest<T> {
   /** What the call is for (logging, cost attribution, and mock routing). */
   purpose: LLMPurpose;
+  /** Room the spend is charged to (spend caps). */
+  roomId?: string;
   /** 'summary' = the cheap model (drafts, recaps); 'turn' = the GM model. */
   tier: Tier;
   system: string;
@@ -59,6 +65,7 @@ export interface ToolUse {
 
 export interface ChatRequest {
   purpose: LLMPurpose;
+  roomId?: string;
   tier: Tier;
   system: SystemBlock[];
   messages: LlmMessage[];

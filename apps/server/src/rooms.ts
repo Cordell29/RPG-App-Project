@@ -64,10 +64,13 @@ export class RoomService {
 
   private readonly random: RandomInt;
 
-  constructor(db: Db, store: EventStore, random: RandomInt = randomInt) {
+  private readonly defaultCapCents: number;
+
+  constructor(db: Db, store: EventStore, random: RandomInt = randomInt, defaultCapCents = 500) {
     this.db = db;
     this.store = store;
     this.random = random;
+    this.defaultCapCents = defaultCapCents;
   }
 
   createRoom(input: CreateRoomInput): Credentials & { hostToken: string; inviteCode: string } {
@@ -93,6 +96,7 @@ export class RoomService {
           inviteCode,
           hostTokenHash: hashToken(hostToken),
           settingsJson: JSON.stringify(defaultRoomSettings(mode)),
+          spendCapCents: this.defaultCapCents,
           createdAt: now,
         })
         .run();

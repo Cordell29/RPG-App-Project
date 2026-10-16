@@ -4,6 +4,7 @@ import { CopyButton } from '../components/CopyButton.tsx';
 import { SettingEditor, validateSetting } from '../components/SettingEditor.tsx';
 import { StartPicker, startChoiceReady } from '../components/StartPicker.tsx';
 import { api } from '../lib/api.ts';
+import { usePublicOrigin } from '../lib/origin.ts';
 import { navigate, setTheme } from '../lib/router.ts';
 import { saveCreds } from '../lib/storage.ts';
 
@@ -28,6 +29,7 @@ export function CreateRoom() {
   const [busy, setBusy] = useState(false);
   const [created, setCreated] = useState<{ roomId: string; hostToken: string; inviteCode: string } | null>(null);
   const [savedAck, setSavedAck] = useState(false);
+  const origin = usePublicOrigin();
 
   useEffect(() => {
     setTheme('neutral');
@@ -77,8 +79,8 @@ export function CreateRoom() {
     }
   }
 
-  const hostLink = created ? `${location.origin}/r/${created.roomId}?host=${created.hostToken}` : '';
-  const inviteLink = created ? `${location.origin}/join/${created.inviteCode}` : '';
+  const hostLink = created ? `${origin}/r/${created.roomId}?host=${created.hostToken}` : '';
+  const inviteLink = created ? `${origin}/join/${created.inviteCode}` : '';
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">

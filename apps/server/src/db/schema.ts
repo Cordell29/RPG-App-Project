@@ -141,6 +141,18 @@ export const commandLog = sqliteTable(
   (t) => [primaryKey({ columns: [t.roomId, t.commandId] }), index('command_log_created_idx').on(t.createdAt)],
 );
 
+export const spend = sqliteTable(
+  'spend',
+  {
+    roomId: text('room_id').notNull(),
+    day: text('day').notNull(),
+    category: text('category').notNull(),
+    microUsd: integer('micro_usd').notNull().default(0),
+    calls: integer('calls').notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.roomId, t.day, t.category] }), index('spend_day_idx').on(t.day)],
+);
+
 export const allTables = {
   rooms,
   players,
@@ -151,4 +163,5 @@ export const allTables = {
   canon,
   assets,
   commandLog,
+  spend,
 };

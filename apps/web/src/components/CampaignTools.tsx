@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api.ts';
+import { usePublicOrigin } from '../lib/origin.ts';
 import { useMedia } from '../lib/media.ts';
 import { downloadBlob } from '../lib/story.ts';
 import { useRoom } from '../lib/store.ts';
@@ -8,6 +9,7 @@ import { CopyButton } from './CopyButton.tsx';
 /** Rejoin links the host has minted this visit (a link works once). */
 function SeatRow({ playerId, name, isHost, here }: { playerId: string; name: string; isHost: boolean; here: boolean }) {
   const creds = useRoom((s) => s.creds);
+  const origin = usePublicOrigin();
   const [link, setLink] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   return (
@@ -27,7 +29,7 @@ function SeatRow({ playerId, name, isHost, here }: { playerId: string; name: str
               setError(null);
               try {
                 const { token } = await api.seatLink(creds, playerId);
-                setLink(`${location.origin}/r/${creds.roomId}?seat=${playerId}.${token}`);
+                setLink(`${origin}/r/${creds.roomId}?seat=${playerId}.${token}`);
               } catch (e) {
                 setError((e as Error).message);
               }
@@ -47,6 +49,57 @@ function SeatRow({ playerId, name, isHost, here }: { playerId: string; name: str
       )}
       {error && <p className="text-xs text-bad">{error}</p>}
     </li>
+  );
+}
+
+/** Today's estimated AI spend and this room's daily cap. */
+function Budget() {
+  const { creds, send, turnStatus } = useRoom();
+  const [spend, setSpend] = useState<Awaited<ReturnType<typeof api.spend>> | null>(null);
+  const [cap, setCap] = useState('');
+  const [note, setNote] = useState<string | null>(null);
+  const load = () => {
+    if (creds) api.spend(creds).then((s) => {
+      setSpend(s);
+      setCap(s.roomCapUsd.toFixed(2));
+    }, () => {});
+  };
+  useEffect(load, [creds]);
+  if (!spend) return null;
+  const pct = Math.min(100, (spend.roomTodayUsd / Math.max(0.01, spend.roomCapUsd)) * 100);
+  return (
+    <section className="space-y-2" data-testid="budget">
+      <h3 className="heading text-base">AI budget today</h3>
+      <p className="text-sm">
+        <strong>${spend.roomTodayUsd.toFixed(2)}</strong> of ${spend.roomCapUsd.toFixed(2)} for this room
+        <span className="text-muted"> · server total ${spend.globalTodayUsd.toFixed(2)} of ${spend.globalCapUsd.toFixed(2)}</span>
+      </p>
+      <div className="h-2 overflow-hidden rounded bg-raised" role="meter" aria-label="Room budget used" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
+        <div className={`h-full ${pct >= 100 ? 'bg-bad' : 'bg-accent'}`} style={{ width: `${pct}%` }} />
+      </div>
+      {turnStatus.status === 'paused' && <p className="text-sm text-bad">{turnStatus.error}</p>}
+      <form
+        className="flex flex-wrap items-end gap-2"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const usd = Number(cap);
+          if (!Number.isFinite(usd) || usd < 0 || usd > 100) return setNote('Enter an amount between $0 and $100.');
+          const res = await send({ type: 'set_spend_cap', usd });
+          setNote(res.ok ? `Daily cap set to $${usd.toFixed(2)}.` : res.error);
+          load();
+        }}
+      >
+        <label className="block">
+          <span className="label">Daily cap (US$)</span>
+          <input className="field w-28" type="number" min={0} max={100} step={0.5} value={cap} onChange={(e) => setCap(e.target.value)} />
+        </label>
+        <button type="submit" className="btn">
+          Set cap
+        </button>
+      </form>
+      <p className="text-xs text-muted">Estimates from token counts and list prices; resets at midnight UTC. Your Anthropic/Google billing limits are the real backstop.</p>
+      {note && <p className="text-xs">{note}</p>}
+    </section>
   );
 }
 
@@ -110,6 +163,7 @@ export function CampaignTools({ onClose }: { onClose: () => void }) {
         </button>
       </header>
       <div className="space-y-6 p-4">
+        <Budget />
         <section className="space-y-2">
           <h3 className="heading text-base">Download the campaign</h3>
           <p className="text-sm text-muted">

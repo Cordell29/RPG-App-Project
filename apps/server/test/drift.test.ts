@@ -85,7 +85,7 @@ describe('200-turn drift test', () => {
   it('prompt stays under budget and planted facts survive to turn 200', { timeout: 120_000 }, async () => {
     let characterId = '';
     const llm = scriptedLlm(() => characterId);
-    const t: TavernApp = await buildApp({ dataDir: tmpDir(), db: testDb(), llm, rulesLookup: false });
+    const t: TavernApp = await buildApp({ dataDir: tmpDir(), db: testDb(), llm, rulesLookup: false, turnsPerMinute: 100_000 });
     const room = t.rooms.createRoom({ roomName: 'Drift', hostName: 'Host', setting: (await import('@tavern/shared')).getPreset('fantasy')!, mode: 'solo' });
     const player = t.rooms.authenticate(room.roomId, room.token)!;
     let n = 0;

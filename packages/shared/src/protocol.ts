@@ -108,6 +108,10 @@ export const CommandSchema = z.discriminatedUnion('type', [
   z.object({ commandId, type: z.literal('rebuild_state') }),
   /** Host: repaint images whose files are missing (e.g. after importing without images). */
   z.object({ commandId, type: z.literal('repaint_missing') }),
+  /** Host: this room's daily AI budget in US dollars (estimates; the server-wide cap still applies). */
+  z.object({ commandId, type: z.literal('set_spend_cap'), usd: z.number().min(0).max(100) }),
+  /** Host: let a returning player take back their seat (or turn them away). */
+  z.object({ commandId, type: z.literal('resolve_rejoin'), requestId: z.string().min(1).max(64), approve: z.boolean() }),
   z.object({
     commandId,
     type: z.literal('host_override'),
@@ -133,11 +137,14 @@ export const HOST_COMMANDS: readonly CommandType[] = [
   'set_start',
   'rebuild_state',
   'repaint_missing',
+  'set_spend_cap',
+  'resolve_rejoin',
 ];
 
 /** Ephemeral GM status, broadcast to the room (not stored). */
 export interface TurnStatus {
-  status: 'idle' | 'collecting' | 'adjudicating' | 'narrating' | 'failed';
+  /** 'paused': the GM is not taking turns (spend cap or turn-rate limit); `error` says why. */
+  status: 'idle' | 'collecting' | 'adjudicating' | 'narrating' | 'failed' | 'paused';
   turnId?: string;
   /** Round mode: epoch ms when the window closes. */
   deadline?: number;
@@ -164,6 +171,18 @@ export interface SyncMessage {
   you: PlayerInfo;
   online: string[];
   turnStatus: TurnStatus;
+  /** Public address of the server (Cloudflare tunnel / PUBLIC_URL), when known. */
+  publicUrl?: string | null;
+  /** Host only: returning players asking to take back their character. */
+  rejoinRequests?: RejoinRequestInfo[];
+}
+
+export interface RejoinRequestInfo {
+  id: string;
+  playerId: string;
+  characterName: string;
+  playerName: string;
+  createdAt: number;
 }
 
 export interface ServerToClientEvents {
@@ -175,6 +194,10 @@ export interface ServerToClientEvents {
   turn_status: (status: TurnStatus) => void;
   /** Streamed narration text (delta) for the turn being narrated. */
   narration_chunk: (msg: { turnId: string; delta: string }) => void;
+  /** The server's public address changed (tunnel restart). */
+  public_url: (msg: { url: string | null }) => void;
+  /** Host only: the current list of pending rejoin requests. */
+  rejoin_requests: (list: RejoinRequestInfo[]) => void;
   /** State was rebuilt on the server: drop the local log and resync from seq 0. */
   reset: () => void;
 }

@@ -90,7 +90,7 @@ export function draftToInput(d: CharacterDraftRaw, preset: SettingPreset | null)
 
 export const MAX_CHARACTER_DESCRIPTION = 1500;
 
-export async function draftCharacter(llm: LLMProvider, preset: SettingPreset | null, description: string) {
+export async function draftCharacter(llm: LLMProvider, preset: SettingPreset | null, description: string, roomId?: string) {
   const text = description.trim();
   if (text.length < 5) throw new LLMError('Describe your character first.');
   if (text.length > MAX_CHARACTER_DESCRIPTION) {
@@ -98,6 +98,7 @@ export async function draftCharacter(llm: LLMProvider, preset: SettingPreset | n
   }
   const { data } = await llm.structured({
     purpose: 'character_draft',
+    ...(roomId ? { roomId } : {}),
     tier: 'summary',
     system: characterDraftSystem(preset),
     prompt: `<character_description>\n${text.replace(/<\/?character_description>/gi, '')}\n</character_description>`,

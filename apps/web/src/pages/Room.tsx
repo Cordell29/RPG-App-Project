@@ -3,6 +3,7 @@ import { CampaignTools } from '../components/CampaignTools.tsx';
 import { CopyButton } from '../components/CopyButton.tsx';
 import { TableLayout } from '../components/TableLayout.tsx';
 import { api } from '../lib/api.ts';
+import { usePublicOrigin } from '../lib/origin.ts';
 import { navigate, setTheme } from '../lib/router.ts';
 import { clearCreds, loadCreds, saveCreds } from '../lib/storage.ts';
 import { useRoom } from '../lib/store.ts';
@@ -42,6 +43,7 @@ export function Room({ roomId, hostToken, seat }: { roomId: string; hostToken: s
   const { status, state, settings, inviteCode, isHost, connect, disconnect, send } = useRoom();
   const [error, setError] = useState<string | null>(null);
   const [tools, setTools] = useState(false);
+  const origin = usePublicOrigin();
 
   useEffect(() => {
     let cancelled = false;
@@ -101,7 +103,7 @@ export function Room({ roomId, hostToken, seat }: { roomId: string; hostToken: s
     );
   }
 
-  const inviteLink = inviteCode ? `${location.origin}/join/${inviteCode}` : '';
+  const inviteLink = inviteCode ? `${origin}/join/${inviteCode}` : '';
   const statusColour = status === 'online' ? 'bg-good' : status === 'reconnecting' ? 'bg-accent-2' : 'bg-muted';
 
   return (
@@ -117,6 +119,13 @@ export function Room({ roomId, hostToken, seat }: { roomId: string; hostToken: s
             {isHost && <> · You're the host</>}
           </p>
         </div>
+        {isHost && origin !== location.origin && (
+          <div className="flex w-full items-center gap-2 text-sm" data-testid="public-link">
+            <span className="label mb-0">Public link</span>
+            <code className="min-w-0 flex-1 truncate">{origin}</code>
+            <CopyButton text={origin} label="Copy" />
+          </div>
+        )}
         {settings?.mode === 'group' && inviteCode && (
           <div className="flex items-center gap-2">
             <span className="label mb-0">Invite</span>

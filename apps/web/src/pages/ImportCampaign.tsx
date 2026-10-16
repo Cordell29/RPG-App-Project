@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CopyButton } from '../components/CopyButton.tsx';
 import { type ImportResult, api } from '../lib/api.ts';
+import { usePublicOrigin } from '../lib/origin.ts';
 import { navigate, setTheme } from '../lib/router.ts';
 import { saveCreds } from '../lib/storage.ts';
 
@@ -11,6 +12,7 @@ export function ImportCampaign() {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<ImportResult | null>(null);
   const [savedAck, setSavedAck] = useState(false);
+  const origin = usePublicOrigin();
   useEffect(() => setTheme('neutral'), []);
 
   async function upload() {
@@ -28,8 +30,8 @@ export function ImportCampaign() {
     }
   }
 
-  const hostLink = done ? `${location.origin}/r/${done.roomId}?host=${done.hostToken}` : '';
-  const inviteLink = done ? `${location.origin}/join/${done.inviteCode}` : '';
+  const hostLink = done ? `${origin}/r/${done.roomId}?host=${done.hostToken}` : '';
+  const inviteLink = done ? `${origin}/join/${done.inviteCode}` : '';
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-10">

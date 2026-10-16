@@ -5,6 +5,7 @@ import { listVoices, speechSupported, useSpeech } from '../lib/speech.ts';
 import { type StoryTurn, buildStory, latestRecap } from '../lib/story.ts';
 import { playerName, useRoom } from '../lib/store.ts';
 import { ApprovalQueue } from './ApprovalQueue.tsx';
+import { RejoinQueue } from './RejoinQueue.tsx';
 import { StartPicker, startChoiceReady } from './StartPicker.tsx';
 import { StoryReader } from './StoryReader.tsx';
 
@@ -256,7 +257,9 @@ function ActionComposer({ prefill, onPrefillUsed }: { prefill: string | null; on
       ? 'The GM is deciding what happens…'
       : turnStatus.status === 'narrating'
         ? 'The GM is telling the story…'
-        : turnStatus.status === 'failed'
+        : turnStatus.status === 'paused'
+          ? `⏸ ${turnStatus.error ?? 'The GM is paused.'}`
+          : turnStatus.status === 'failed'
           ? `The GM stumbled: ${turnStatus.error ?? 'unknown error'}. The host can retry.`
           : spotlight
             ? `Spotlight: ${playerName(state, spotlight)}${spotlight === me ? ' (you)' : ''}`
@@ -270,7 +273,7 @@ function ActionComposer({ prefill, onPrefillUsed }: { prefill: string | null; on
 
   return (
     <div className="space-y-2 border-t border-line pt-3" data-testid="action-composer">
-      <p className={`text-sm ${turnStatus.status === 'failed' ? 'text-bad' : 'text-muted'}`} role="status" data-testid="turn-status">
+      <p className={`text-sm ${turnStatus.status === 'failed' || turnStatus.status === 'paused' ? 'text-bad' : 'text-muted'}`} role="status" data-testid="turn-status">
         {status}
         {turnStatus.status === 'collecting' && (
           <>
@@ -503,6 +506,7 @@ export function StoryPanel() {
       )}
       {isHost && <HostTurnControls />}
       {isHost && <ApprovalQueue />}
+      {isHost && <RejoinQueue />}
 
       {(sceneId || scenePending) && (
         <figure data-testid="scene-image">
