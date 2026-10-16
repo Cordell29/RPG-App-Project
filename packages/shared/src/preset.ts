@@ -49,6 +49,15 @@ export const THEMES = ['parchment', 'neon', 'neutral'] as const;
 export const ThemeSchema = z.enum(THEMES);
 export type Theme = z.infer<typeof ThemeSchema>;
 
+/** A place the campaign can open in. Presets carry a table of these; one is rolled per campaign. */
+export const StartSchema = z.object({
+  title: z.string().trim().min(1).max(120),
+  description: z.string().trim().min(1).max(600),
+  /** Up to three ways in, shown as quick options before the first turn. */
+  hooks: z.array(z.string().trim().min(1).max(300)).max(3).default([]),
+});
+export type Start = z.infer<typeof StartSchema>;
+
 /** Display-only flavour for a campaign. Internal field names (gold, str, …) never change. */
 export const SettingPresetSchema = z.object({
   key: z.string().regex(/^[a-z0-9_-]{1,40}$/),
@@ -58,6 +67,8 @@ export const SettingPresetSchema = z.object({
   statLabels: StatLabelsSchema,
   roles: z.array(RoleSchema).min(4).max(8),
   openingHooks: z.array(z.string().trim().min(1).max(500)).length(3),
+  /** Starting-location table; room creation rolls on it (or the host picks or writes one). */
+  starts: z.array(StartSchema).max(30).default([]),
   artStyle: z.string().trim().min(1).max(1000),
   contentNotes: z.string().max(1000).optional(),
   /** Visual theme for the web app. CSS only; no effect on rules. */

@@ -39,6 +39,29 @@ describe('sanitizeAction', () => {
   });
 });
 
+describe('buildTurnPrompt: the opening', () => {
+  const withStart = (source: 'random' | 'custom') => {
+    const s = state();
+    return {
+      ...s,
+      opening: { title: 'The Drowned Bell', description: 'A flooded chapel where a bell tolls under the water.', hooks: [], source },
+      scene: { locationKey: 'the_drowned_bell', title: 'The Drowned Bell', description: 'A flooded chapel where a bell tolls under the water.' },
+    };
+  };
+  it('the first turn opens at the chosen starting location', () => {
+    const p = buildTurnPrompt({ state: withStart('random'), recent: [], actions });
+    expect(p.user).toMatch(/first turn of the campaign[\s\S]*opens at "The Drowned Bell": A flooded chapel/);
+  });
+  it('a host-written start is followed closely and marked as the host\'s', () => {
+    const p = buildTurnPrompt({ state: withStart('custom'), recent: [], actions });
+    expect(p.user).toMatch(/The host wrote this starting location/);
+  });
+  it('later turns do not repeat the opening instruction', () => {
+    const p = buildTurnPrompt({ state: withStart('random'), recent: [{ actions: ['Ayla: hi'], gist: 'ok' }], actions });
+    expect(p.user).not.toMatch(/opens at/);
+  });
+});
+
 describe('buildTurnPrompt', () => {
   it('puts static blocks first with cache breakpoints, then state, recent turns and actions', () => {
     const p = buildTurnPrompt({ state: state(), recent: [{ actions: ['Ayla: I enter the crypt.'], gist: 'The crypt is cold.' }], actions });

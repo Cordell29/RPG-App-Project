@@ -19,6 +19,9 @@ export function Home() {
           <button type="button" className="btn btn-primary" onClick={() => navigate('/new')}>
             New campaign
           </button>
+          <button type="button" className="text-sm text-muted underline" onClick={() => navigate('/import')}>
+            Restore a campaign from a backup file
+          </button>
         </section>
         <section className="panel flex flex-col gap-3 p-6">
           <h2 className="heading text-xl">Join a table</h2>

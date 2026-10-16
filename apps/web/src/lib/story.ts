@@ -146,7 +146,11 @@ export function storyMarkdown(roomName: string, events: GameEvent[], state: Game
 }
 
 export function downloadText(filename: string, text: string, type = 'text/markdown') {
-  const url = URL.createObjectURL(new Blob([text], { type: `${type};charset=utf-8` }));
+  downloadBlob(filename, new Blob([text], { type: `${type};charset=utf-8` }));
+}
+
+export function downloadBlob(filename: string, blob: Blob) {
+  const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;

@@ -10,11 +10,11 @@ const order = ['Strength', 'Constitution', 'Dexterity', 'Wisdom', 'Charisma', 'I
 
 async function act(page: Page, text: string) {
   await page.getByLabel(/What does .* do\?/).fill(text);
-  await page.getByRole('button', { name: 'Act' }).click();
+  await page.getByRole('button', { name: 'Act', exact: true }).click();
 }
 
 test('solo: act, the GM rolls and narrates, suggestions and rewind work', async ({ page }) => {
-  await createRoom(page, { mode: 'solo' });
+  await createRoom(page, { mode: 'solo', start: 'The Gilded Goose Tavern' });
   await quickCharacter(page, { role: 'Fighter', name: 'Ayla', order });
 
   // Opening hooks prefill the action box.

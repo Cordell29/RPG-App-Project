@@ -725,6 +725,13 @@ forType('session_recap', () => {
   });
 });
 
+describe('image_ready repaint', () => {
+  it('changes nothing but seq', () => {
+    const { before, after } = step(seededLog(), (l) => l.push('image_ready', { assetId: 'a1', kind: 'scene', repaint: true }));
+    expectOnlySeqChanged(before, after);
+  });
+});
+
 forType('image_failed', () => {
   it('changes nothing but seq', () => {
     const { before, after } = step(seededLog(), (l) => l.push('image_failed', { assetId: 'a1', reason: 'quota' }));
@@ -736,6 +743,34 @@ forType('audio_ready', () => {
   it('changes nothing but seq', () => {
     const { before, after } = step(seededLog(), (l) => l.push('audio_ready', { assetId: 'v1', narrationSeq: 3 }));
     expectOnlySeqChanged(before, after);
+  });
+});
+
+forType('start_set', () => {
+  const start = {
+    title: 'The Drowned Bell',
+    description: 'A flooded chapel where a bell still rings beneath the water.',
+    hooks: ['Dive for the bell', 'Question the ferryman'],
+    source: 'random' as const,
+  };
+  it('records the opening and moves the scene there', () => {
+    const { after } = step(seededLog(), (l) => l.push('start_set', { start }));
+    expect(after.opening).toEqual(start);
+    expect(after.scene).toEqual({ locationKey: 'the_drowned_bell', title: start.title, description: start.description });
+  });
+  it('can be changed again before the first turn', () => {
+    const log = seededLog();
+    log.push('start_set', { start });
+    const { after } = step(log, (l) => l.push('start_set', { start: { ...start, title: 'Custom', source: 'custom', hooks: [] } }));
+    expect(after.opening?.source).toBe('custom');
+    expect(after.scene.locationKey).toBe('custom');
+  });
+  it('is refused once the story has begun', () => {
+    const log = seededLog();
+    log.push('turn_started', { turnId: 't1', actionSeqs: [] }, { turnId: 't1' });
+    const state = replay(log.events);
+    log.push('start_set', { start });
+    expect(() => apply(state, log.last)).toThrow(/already begun/);
   });
 });
 

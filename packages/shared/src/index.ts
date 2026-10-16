@@ -14,3 +14,4 @@ export * from './character.ts';
 export * from './derived.ts';
 export * from './tokens.ts';
 export * from './canon.ts';
+export * from './start.ts';

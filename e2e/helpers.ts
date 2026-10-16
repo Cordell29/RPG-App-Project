@@ -2,14 +2,18 @@ import { type Browser, type BrowserContextOptions, type Page, expect } from '@pl
 
 export async function createRoom(
   page: Page,
-  opts: { mode?: 'solo' | 'group'; preset?: 'Fantasy' | 'Sci-fi'; name?: string } = {},
+  opts: { mode?: 'solo' | 'group'; preset?: 'Fantasy' | 'Sci-fi'; name?: string; start?: string } = {},
 ) {
-  const { mode = 'group', preset = 'Fantasy', name = 'The Gilded Goose' } = opts;
+  const { mode = 'group', preset = 'Fantasy', name = 'The Gilded Goose', start } = opts;
   await page.goto('/new');
   await page.getByRole('button', { name: `Play ${preset}` }).click();
   await page.getByLabel('Campaign name').fill(name);
   await page.getByLabel('Your name').fill('Cordell');
   await page.getByRole('radio', { name: mode === 'solo' ? /Solo/ : /With friends/ }).check();
+  if (start) {
+    await page.getByRole('radio', { name: /Choose one/ }).check();
+    await page.getByLabel('Starting location', { exact: true }).selectOption({ label: start });
+  }
   await page.getByRole('button', { name: 'Create campaign' }).click();
   const invite = mode === 'group' ? (await page.getByTestId('invite-code').textContent())!.trim() : '';
   await page.getByLabel("I've saved my host link").check();

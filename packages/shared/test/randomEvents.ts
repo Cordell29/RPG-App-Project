@@ -45,6 +45,7 @@ export function randomEvents(count: number, seed: number, opts: { voids?: boolea
   };
 
   push('room_created', { name: 'Random', setting: FANTASY });
+  push('start_set', { start: { title: 'Random Start', description: 'Somewhere.', hooks: ['Look around'], source: 'random' } });
 
   while (log.events.length < count) {
     const players = state.players;

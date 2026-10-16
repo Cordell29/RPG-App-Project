@@ -23,6 +23,7 @@ const DraftSchema = z.object({
   }),
   roles: z.array(z.object({ name: z.string(), summary: z.string(), startingKit: z.array(z.string()) })),
   openingHooks: z.array(z.string()),
+  starts: z.array(z.object({ title: z.string(), description: z.string(), hooks: z.array(z.string()) })).default([]),
   artWorldDetails: z.string(),
   contentNotes: z.string(),
   theme: z.enum(THEMES),
@@ -44,6 +45,7 @@ Fill every field:
   wis = perception/intuition, cha = force of personality.
 - roles: exactly 6, each with a one-sentence summary and 3–4 starting-kit items (short names).
 - openingHooks: exactly 3, each one or two sentences.
+- starts: 8 varied starting locations, each a short title, a one- or two-sentence description of the place and the situation the party is in, and 2 hooks (short ways in). Vary them: towns, wilderness, travel, captivity, ruins, celebrations, disasters.
 - artWorldDetails: one sentence of visual details for illustrations (costume, technology, palette).
   Do not name artists, books, films, games or publishers.
 - contentNotes: topics the description asks to avoid or soften; empty if none.
@@ -84,6 +86,10 @@ export function draftToPreset(d: Draft): SettingPreset {
       startingKit: r.startingKit.slice(0, 12).map((i) => clip(i, 80)).filter(Boolean),
     })),
     openingHooks: d.openingHooks.slice(0, 3).map((h) => clip(h, 500)),
+    starts: d.starts
+      .slice(0, 30)
+      .map((st) => ({ title: clip(st.title, 120), description: clip(st.description, 600), hooks: st.hooks.slice(0, 3).map((h) => clip(h, 300)).filter(Boolean) }))
+      .filter((st) => st.title && st.description),
     artStyle: clip(`${PAINTERLY_BASE} ${d.artWorldDetails}`, 1000),
     ...(d.contentNotes.trim() ? { contentNotes: clip(d.contentNotes, 1000) } : {}),
     theme: d.theme,
@@ -129,6 +135,11 @@ export function mockSettingDraft(description: string): Draft {
       'A stranger arrives with an urgent request.',
       'Something valuable has gone missing.',
       'An old map surfaces with a place no one remembers.',
+    ],
+    starts: [
+      { title: 'The Crossing', description: 'A busy ferry crossing at dusk, the last boat about to leave.', hooks: ['Board the last boat', 'Help the stranded traveller'] },
+      { title: 'The Ruined Archive', description: 'A half-collapsed library where something still keeps the lamps lit.', hooks: ['Follow the lamplight', 'Search the fallen shelves'] },
+      { title: 'Market Day', description: 'A crowded market square as a thief bolts past with something glowing.', hooks: ['Give chase', 'Calm the panicked merchant'] },
     ],
     artWorldDetails: 'Details drawn from the host description.',
     contentNotes: '',

@@ -45,6 +45,7 @@ export function attachRealtime(
   rooms.onEvents = broadcast;
   commands.onEvents = broadcast;
   commands.onSettings = (roomId, settings) => io.to(roomId).emit('settings', settings);
+  commands.onReset = (roomId) => io.to(roomId).emit('reset');
 
   const onlineIds = (roomId: string) => [...(online.get(roomId)?.keys() ?? [])];
 

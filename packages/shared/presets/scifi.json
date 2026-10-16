@@ -247,6 +247,120 @@
     "A corporate fixer offers triple pay to smuggle a sealed cryo-pod past a navy blockade, no questions asked.",
     "The colony's terraforming engine has started broadcasting a message in a language no one recognises."
   ],
+  "starts": [
+    {
+      "title": "Bleakhold Station",
+      "description": "A mining outpost bolted to a tumbling asteroid at the edge of the Forge, where the last supply ship is three weeks overdue and the scrubbers are failing.",
+      "hooks": [
+        "Volunteer for the run to the derelict freighter nearby",
+        "Find out who sabotaged the oxygen scrubbers"
+      ]
+    },
+    {
+      "title": "The Derelict Kestrel",
+      "description": "Aboard a colony ship found drifting with its lights on and its cryo-pods empty, your small crew the first to answer its automated distress call.",
+      "hooks": [
+        "Restore power to the bridge",
+        "Follow the scratching sound in the cargo deck"
+      ]
+    },
+    {
+      "title": "Rain City, Vanta Prime",
+      "description": "A neon-drenched orbital port under perpetual storm, where a fixer in a noodle bar offers credits for a data spike nobody else will touch.",
+      "hooks": [
+        "Take the spike and run",
+        "Ask who wanted it delivered before you did"
+      ]
+    },
+    {
+      "title": "The Iron Vow",
+      "description": "Kneeling at a fallen comrade's memorial on a frontier settlement, having just sworn to find the raiders who burned it.",
+      "hooks": [
+        "Track the raiders' ion trail into the asteroid belt",
+        "Question the survivor who saw the raiders' faces"
+      ]
+    },
+    {
+      "title": "Crash Site Theta",
+      "description": "Your shuttle has crash-landed on an uncharted jungle moon; the beacon is dead, the pilot is injured, and something large is moving in the canopy.",
+      "hooks": [
+        "Scavenge parts to repair the beacon",
+        "Carry the pilot toward the strange light on the ridge"
+      ]
+    },
+    {
+      "title": "The Precursor Vault",
+      "description": "An alien vault exposed by a quake on a dusty world, its doors humming with glyphs that rearrange when you look away.",
+      "hooks": [
+        "Touch the glyphs",
+        "Hold the vault against the rival salvage crew arriving in orbit"
+      ]
+    },
+    {
+      "title": "Customs Hold at Gate Nine",
+      "description": "Detained at a jumpgate checkpoint, your ship impounded and cargo flagged as contraband you've never seen before.",
+      "hooks": [
+        "Bribe the customs officer",
+        "Break out and reclaim your ship"
+      ]
+    },
+    {
+      "title": "The Long Haul",
+      "description": "Six months into a slow cargo run between colonies when the navigation AI announces, calmly, that it has changed course.",
+      "hooks": [
+        "Ask the AI why",
+        "Cut its power before it reaches the new coordinates"
+      ]
+    },
+    {
+      "title": "Starfall Settlement",
+      "description": "A farming colony on an ice world, where a burning object has fallen from orbit into the north field and the colonists are too frightened to approach.",
+      "hooks": [
+        "Lead the colonists to the crater",
+        "Intercept the corporate ship already descending to claim it"
+      ]
+    },
+    {
+      "title": "The Gladiator Pits of Korr",
+      "description": "Bought as fighters for a pirate lord's arena on a hollowed-out moon, the first bout scheduled for tonight.",
+      "hooks": [
+        "Win the crowd and the lord's ear",
+        "Plan an escape with the other fighters"
+      ]
+    },
+    {
+      "title": "Ghostlight Nebula",
+      "description": "Drifting in a sensor-blinding nebula where ships vanish, chasing a bounty on a smuggler who hid here a month ago.",
+      "hooks": [
+        "Follow the faint transponder ping",
+        "Answer the hail from a ship that went missing ten years ago"
+      ]
+    },
+    {
+      "title": "The Quarantine Ring",
+      "description": "An orbital hab-ring sealed by a mysterious contagion, your crew docked just before lockdown and now trapped inside with the infected.",
+      "hooks": [
+        "Reach the medical bay and the research data",
+        "Find the corporate executive who ordered the seal"
+      ]
+    },
+    {
+      "title": "Envoy's Gambit",
+      "description": "Hired as security for a diplomat brokering peace between two warring settlements, the talks set to begin as the diplomat fails to wake.",
+      "hooks": [
+        "Investigate the diplomat's quarters",
+        "Keep the talks from collapsing while you search"
+      ]
+    },
+    {
+      "title": "Wreckers' Moon",
+      "description": "A salvage yard moon where crews strip dead ships for parts, and the hulk you just bought at auction still has someone alive inside.",
+      "hooks": [
+        "Cut through the sealed bulkhead",
+        "Find out who sold you the wreck and why"
+      ]
+    }
+  ],
   "artStyle": "Painterly science-fiction concept illustration in the style of a roleplaying sourcebook. Realistic proportions, worn practical equipment, dramatic rim lighting, visible brushwork, rich but slightly muted colours.",
   "theme": "neon",
   "slotsLabel": "Tech charges",

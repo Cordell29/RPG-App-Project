@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { CampaignTools } from '../components/CampaignTools.tsx';
 import { CopyButton } from '../components/CopyButton.tsx';
 import { TableLayout } from '../components/TableLayout.tsx';
 import { api } from '../lib/api.ts';
@@ -18,6 +19,17 @@ function claimHostOnce(roomId: string, hostToken: string) {
   return p;
 }
 
+/** Rejoin links from the host: `?seat=<playerId>.<token>`, redeemed once for a fresh token. */
+function claimSeatOnce(roomId: string, seat: string) {
+  let p = claims.get(seat);
+  if (!p) {
+    const [playerId = '', token = ''] = seat.split('.');
+    p = api.claimSeat(roomId, playerId, token).then(saveCreds);
+    claims.set(seat, p);
+  }
+  return p;
+}
+
 const STATUS_TEXT = {
   idle: 'Not connected',
   connecting: 'Connecting…',
@@ -26,9 +38,10 @@ const STATUS_TEXT = {
   unauthorized: 'Seat not recognised',
 } as const;
 
-export function Room({ roomId, hostToken }: { roomId: string; hostToken: string | null }) {
+export function Room({ roomId, hostToken, seat }: { roomId: string; hostToken: string | null; seat?: string | null }) {
   const { status, state, settings, inviteCode, isHost, connect, disconnect, send } = useRoom();
   const [error, setError] = useState<string | null>(null);
+  const [tools, setTools] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -42,6 +55,15 @@ export function Room({ roomId, hostToken }: { roomId: string; hostToken: string 
         navigate(`/r/${roomId}`, true); // drop the host token from the address bar
         return;
       }
+      if (seat) {
+        try {
+          await claimSeatOnce(roomId, seat);
+        } catch (e) {
+          if (!cancelled) setError((e as Error).message);
+        }
+        navigate(`/r/${roomId}`, true);
+        return;
+      }
       const creds = loadCreds(roomId);
       if (!creds) return navigate(`/join?room=${encodeURIComponent(roomId)}`, true);
       connect(creds);
@@ -49,7 +71,7 @@ export function Room({ roomId, hostToken }: { roomId: string; hostToken: string 
     return () => {
       cancelled = true;
     };
-  }, [roomId, hostToken, connect]);
+  }, [roomId, hostToken, seat, connect]);
 
   useEffect(() => () => disconnect(), [disconnect]);
 
@@ -116,6 +138,11 @@ export function Room({ roomId, hostToken }: { roomId: string; hostToken: string 
             Invite friends
           </button>
         )}
+        {isHost && (
+          <button type="button" className="btn text-sm" onClick={() => setTools(true)}>
+            Backup &amp; seats
+          </button>
+        )}
         <div className="flex items-center gap-2 text-sm" role="status" data-testid="connection-status" data-status={status}>
           <span className={`inline-block h-2.5 w-2.5 rounded-full ${statusColour}`} aria-hidden="true" />
           {STATUS_TEXT[status]}
@@ -129,6 +156,7 @@ export function Room({ roomId, hostToken }: { roomId: string; hostToken: string 
       )}
 
       <TableLayout />
+      {tools && <CampaignTools onClose={() => setTools(false)} />}
     </div>
   );
 }

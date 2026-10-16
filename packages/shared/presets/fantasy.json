@@ -244,6 +244,120 @@
     "The village well has started whispering at night, and the children who listen stop speaking by morning.",
     "The duke offers a fortune to anyone who will escort his estranged daughter through the haunted Greywood before the solstice."
   ],
+  "starts": [
+    {
+      "title": "The Gilded Goose Tavern",
+      "description": "A crowded roadside inn at the edge of the Greywood, loud with drovers, minstrels and rumours, on the night the hooded riders come.",
+      "hooks": [
+        "A dying courier presses a sealed map into your hands",
+        "The bard's song names someone in this room as a murderer"
+      ]
+    },
+    {
+      "title": "The Drowned Bell",
+      "description": "A flooded chapel in the fen-village of Marrowmere, where a bronze bell still tolls beneath the black water every midnight.",
+      "hooks": [
+        "Dive for the bell before it rings again",
+        "Ask the ferryman why he will not cross after dark"
+      ]
+    },
+    {
+      "title": "Caravan to Saltreach",
+      "description": "Day nine on a merchant caravan crossing the Glass Flats, water running low and the guide missing since dawn.",
+      "hooks": [
+        "Track the guide's footprints into the dunes",
+        "Search the wagons: someone is hoarding water"
+      ]
+    },
+    {
+      "title": "The Prisoner Hulk",
+      "description": "Shackled in the hold of a prison barge drifting down the Iron River toward the mines, with a storm coming and the guards drunk.",
+      "hooks": [
+        "Pick the lock while thunder covers the noise",
+        "Make a pact with the hooded prisoner chained beside you"
+      ]
+    },
+    {
+      "title": "Festival of Lanterns",
+      "description": "The free city of Vellmarch on its brightest night, ten thousand paper lanterns rising over the canals as a noble is poisoned at the masked ball.",
+      "hooks": [
+        "Catch the masked servant fleeing the ballroom",
+        "Taste the wine before the city guard seals the hall"
+      ]
+    },
+    {
+      "title": "Ruins of Kael Tor",
+      "description": "A crumbling dwarven watchtower on a mountain pass, where the party shelters from a blizzard and finds the stairs leading down are freshly swept.",
+      "hooks": [
+        "Follow the stairs into the dark",
+        "Wake the frozen traveller slumped by the door"
+      ]
+    },
+    {
+      "title": "The Wizard's Auction",
+      "description": "A sealed manor where the belongings of a vanished archmage are being sold to the highest bidder, and one lot is bidding back.",
+      "hooks": [
+        "Bid on the whispering music box",
+        "Slip upstairs to the archmage's locked study"
+      ]
+    },
+    {
+      "title": "Siege of Brannock Keep",
+      "description": "A border castle three days into a siege by an orc warband, food rationed and morale breaking, as the lord asks for volunteers.",
+      "hooks": [
+        "Sneak out through the old smugglers' tunnel",
+        "Parley with the warlord under a flag of truce"
+      ]
+    },
+    {
+      "title": "The Moonlit Grove",
+      "description": "A druid circle deep in the Elderwood where the standing stones have begun bleeding sap, and the animals have gone silent.",
+      "hooks": [
+        "Ask the ancient oak what wounded it",
+        "Follow the trail of dead birds northward"
+      ]
+    },
+    {
+      "title": "Shipwreck on the Teeth",
+      "description": "Washed up on a jagged island after your ship struck the reef called the Teeth, with three other survivors and a locked sea-chest.",
+      "hooks": [
+        "Open the chest the captain died protecting",
+        "Climb toward the smoke rising from the island's peak"
+      ]
+    },
+    {
+      "title": "The Thieves' Market",
+      "description": "The Undercroft, a bazaar of stolen goods beneath the city of Ashport, where a fence offers the party a job too well paid to be honest.",
+      "hooks": [
+        "Take the job: steal a reliquary from the cathedral",
+        "Find out who really hired the fence"
+      ]
+    },
+    {
+      "title": "Plague Gate",
+      "description": "A quarantined river town whose gates were sealed a week ago, the party trapped inside as the sickness spreads and a cure is rumoured in the old temple.",
+      "hooks": [
+        "Break into the temple vault",
+        "Help the healer smuggle children over the wall"
+      ]
+    },
+    {
+      "title": "The Dragon's Tithe",
+      "description": "A mountain village preparing its once-a-decade tribute to the red dragon Vorathyx, short one chest of gold and one volunteer.",
+      "hooks": [
+        "Find the stolen gold before sundown",
+        "Climb to the lair to bargain directly"
+      ]
+    },
+    {
+      "title": "The Crossroads Gallows",
+      "description": "A lonely crossroads at dusk where a condemned stranger begs the party to cut him down, swearing he knows where the king's lost heir is hidden.",
+      "hooks": [
+        "Cut him down and hear his story",
+        "Wait for the executioner to arrive"
+      ]
+    }
+  ],
   "artStyle": "Painterly digital illustration in the style of a modern fantasy roleplaying sourcebook. Realistic proportions, detailed costume and gear, dramatic rim lighting, visible brushwork, rich but slightly muted colours.",
   "theme": "parchment",
   "slotsLabel": "Spell slots",

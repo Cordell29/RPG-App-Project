@@ -1,10 +1,11 @@
-import { type EventOf, LIMITS } from '@tavern/shared';
+import { type EventOf, LIMITS, type StartChoice } from '@tavern/shared';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { imageUrl, useMedia, voiceUrl } from '../lib/media.ts';
 import { listVoices, speechSupported, useSpeech } from '../lib/speech.ts';
 import { type StoryTurn, buildStory, latestRecap } from '../lib/story.ts';
 import { playerName, useRoom } from '../lib/store.ts';
 import { ApprovalQueue } from './ApprovalQueue.tsx';
+import { StartPicker, startChoiceReady } from './StartPicker.tsx';
 import { StoryReader } from './StoryReader.tsx';
 
 type Roll = EventOf<'dice_rolled'>['payload'];
@@ -45,9 +46,13 @@ export function SpeakButton({ text, seq }: { text: string; seq: number }) {
 
 function Illustration({ assetId, alt, className = '' }: { assetId: string; alt: string; className?: string }) {
   const roomId = useRoom((s) => s.creds?.roomId ?? '');
-  const status = useMedia().status.get(assetId);
-  if (status === 'ready') return <img src={imageUrl(roomId, assetId)} alt={alt} className={`w-full rounded-[var(--t-radius)] border border-line object-cover ${className}`} loading="lazy" data-testid="illustration" />;
-  if (status === 'failed')
+  const media = useMedia();
+  const status = media.status.get(assetId);
+  const src = imageUrl(roomId, assetId, media.version.get(assetId));
+  const [broken, setBroken] = useState<string | null>(null);
+  if (status === 'ready' && broken !== src)
+    return <img src={src} alt={alt} className={`w-full rounded-[var(--t-radius)] border border-line object-cover ${className}`} loading="lazy" onError={() => setBroken(src)} data-testid="illustration" />;
+  if (status === 'failed' || broken === src)
     return (
       <p className="text-xs text-muted" data-testid="illustration-failed">
         (The illustration of {alt} could not be painted.)
@@ -167,7 +172,7 @@ function HostTurnControls() {
         <button type="button" className="btn py-1 text-sm" disabled={!state.turn.pending.length || state.turn.phase === 'resolving'} onClick={() => run({ type: 'resolve_now' })}>
           Resolve now
         </button>
-        {turnStatus.status === 'failed' && (
+        {(turnStatus.status === 'failed' || (state.turn.phase === 'resolving' && turnStatus.status === 'idle')) && (
           <button type="button" className="btn btn-primary py-1 text-sm" onClick={() => run({ type: 'retry_turn' })}>
             Retry
           </button>
@@ -367,6 +372,76 @@ function ActionComposer({ prefill, onPrefillUsed }: { prefill: string | null; on
   );
 }
 
+/** Before the first turn: where the story opens, quick ways in, and (host) re-roll or change it. */
+function Opening({ onPick }: { onPick: (text: string) => void }) {
+  const { state, isHost, send } = useRoom();
+  const [changing, setChanging] = useState(false);
+  const [choice, setChoice] = useState<StartChoice>({ kind: 'pick', index: 0 });
+  const [error, setError] = useState<string | null>(null);
+  const opening = state.opening;
+  const hooks = opening ? opening.hooks : (state.setting?.openingHooks ?? []);
+  const apply = async (start: StartChoice) => {
+    setError(null);
+    const res = await send({ type: 'set_start', start });
+    if (res.ok) setChanging(false);
+    else setError(res.error);
+  };
+  return (
+    <div className="space-y-3" data-testid="opening">
+      {opening ? (
+        <div className="rounded-[var(--t-radius)] border border-line bg-raised p-3">
+          <p className="label mb-0.5">The story begins at</p>
+          <h3 className="heading text-lg" data-testid="opening-title">
+            {opening.title}
+          </h3>
+          <p className="text-sm leading-relaxed">{opening.description}</p>
+        </div>
+      ) : (
+        <p className="text-muted">{state.setting?.tone}</p>
+      )}
+      {isHost && !state.turn.pending.length && (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <button type="button" className="btn py-1 text-sm" onClick={() => apply({ kind: 'random' })}>
+            🎲 Somewhere else
+          </button>
+          <button type="button" className={`btn py-1 text-sm ${changing ? 'btn-primary' : ''}`} aria-expanded={changing} onClick={() => setChanging((c) => !c)}>
+            Choose or write a start
+          </button>
+        </div>
+      )}
+      {changing && (
+        <form
+          className="space-y-2 rounded-[var(--t-radius)] border border-dashed border-line p-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void apply(choice);
+          }}
+        >
+          <StartPicker setting={state.setting} value={choice} onChange={setChoice} idPrefix="room-start" />
+          <button type="submit" className="btn btn-primary" disabled={!startChoiceReady(choice)}>
+            Start here
+          </button>
+        </form>
+      )}
+      {error && (
+        <p className="text-sm text-bad" role="alert">
+          {error}
+        </p>
+      )}
+      <p className="text-sm text-muted">{hooks.length ? 'Describe what your character does to begin, or start from one of these:' : 'Describe what your character does to begin.'}</p>
+      <ul className="space-y-1.5">
+        {hooks.map((h) => (
+          <li key={h}>
+            <button type="button" className="w-full rounded-[var(--t-radius)] border border-line p-2 text-left text-sm hover:border-accent" onClick={() => onPick(`Let's begin: ${h}`)}>
+              {h}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 /** The story: turns, rolls, narration (streamed live), suggestions and the action box. */
 export function StoryPanel() {
   const { state, events, streaming, turnStatus, isHost, liveNarrationSeq, settings, creds } = useRoom();
@@ -451,21 +526,7 @@ export function StoryPanel() {
         </aside>
       )}
 
-      {turns.length === 0 && !streaming && (
-        <div className="space-y-2">
-          <p className="text-muted">{state.setting?.tone}</p>
-          <p className="text-sm text-muted">Describe what your character does to begin, or start from one of these:</p>
-          <ul className="space-y-1.5">
-            {state.setting?.openingHooks.map((h) => (
-              <li key={h}>
-                <button type="button" className="w-full rounded-[var(--t-radius)] border border-line p-2 text-left text-sm hover:border-accent" onClick={() => setPrefill(`Let's begin: ${h}`)}>
-                  {h}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {turns.length === 0 && !streaming && <Opening onPick={setPrefill} />}
 
       {turns.length > 0 && (
         <ol className="max-h-[60vh] space-y-5 overflow-y-auto pr-1 lg:max-h-[55vh]" aria-live="polite" data-testid="story-feed">

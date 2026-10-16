@@ -1,7 +1,8 @@
-import { LIMITS, type SettingPreset } from '@tavern/shared';
+import { LIMITS, type SettingPreset, type StartChoice } from '@tavern/shared';
 import { useEffect, useState } from 'react';
 import { CopyButton } from '../components/CopyButton.tsx';
 import { SettingEditor, validateSetting } from '../components/SettingEditor.tsx';
+import { StartPicker, startChoiceReady } from '../components/StartPicker.tsx';
 import { api } from '../lib/api.ts';
 import { navigate, setTheme } from '../lib/router.ts';
 import { saveCreds } from '../lib/storage.ts';
@@ -22,6 +23,7 @@ export function CreateRoom() {
   const [roomName, setRoomName] = useState('');
   const [hostName, setHostName] = useState('');
   const [mode, setMode] = useState<'solo' | 'group'>('group');
+  const [start, setStart] = useState<StartChoice>({ kind: 'random' });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [created, setCreated] = useState<{ roomId: string; hostToken: string; inviteCode: string } | null>(null);
@@ -34,6 +36,7 @@ export function CreateRoom() {
 
   function choose(p: SettingPreset, next: Step) {
     setSetting(structuredClone(p));
+    setStart({ kind: 'random' });
     setTheme(p.theme);
     if (!roomName) setRoomName(`${p.name} campaign`);
     setError(null);
@@ -63,7 +66,7 @@ export function CreateRoom() {
     setBusy(true);
     setError(null);
     try {
-      const res = await api.createRoom({ roomName: roomName.trim(), hostName: hostName.trim(), setting, mode });
+      const res = await api.createRoom({ roomName: roomName.trim(), hostName: hostName.trim(), setting, mode, start });
       saveCreds({ roomId: res.roomId, playerId: res.playerId, token: res.token });
       setCreated({ roomId: res.roomId, hostToken: res.hostToken, inviteCode: res.inviteCode });
       setStep('saved');
@@ -230,11 +233,12 @@ export function CreateRoom() {
                 ))}
               </div>
             </fieldset>
+            <StartPicker setting={setting} value={start} onChange={setStart} />
             <div className="flex justify-between gap-2">
               <button type="button" className="btn" onClick={() => setStep('world')}>
                 Change world
               </button>
-              <button type="submit" className="btn btn-primary" disabled={busy || !roomName.trim() || !hostName.trim()}>
+              <button type="submit" className="btn btn-primary" disabled={busy || !roomName.trim() || !hostName.trim() || !startChoiceReady(start)}>
                 {busy ? 'Creating…' : 'Create campaign'}
               </button>
             </div>

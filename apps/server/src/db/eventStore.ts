@@ -132,6 +132,34 @@ export class EventStore {
     return result.appended;
   }
 
+  /**
+   * Writes an imported log verbatim (original seqs and timestamps) into an empty room.
+   * The caller has already validated and replayed it; this replays once more so the cache
+   * and snapshot come from exactly what was stored. Runs inside the caller's transaction.
+   */
+  importEvents(roomId: string, log: GameEvent[]): GameState {
+    const state = replay(log);
+    for (let i = 0; i < log.length; i += 500) {
+      this.db
+        .insert(events)
+        .values(
+          log.slice(i, i + 500).map((e) => ({
+            roomId,
+            seq: e.seq,
+            type: e.type,
+            actorId: e.actorId,
+            turnId: e.turnId,
+            payloadJson: JSON.stringify(e.payload),
+            createdAt: e.createdAt,
+          })),
+        )
+        .run();
+    }
+    this.writeSnapshot(roomId, state);
+    this.cache.set(roomId, state);
+    return state;
+  }
+
   /** Host "Rebuild state": replay everything from scratch and replace the cached snapshot. */
   rebuild(roomId: string): GameState {
     const state = replay(this.loadEvents(roomId), undefined, this.reducer);

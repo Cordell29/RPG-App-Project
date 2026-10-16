@@ -62,6 +62,8 @@ export function Portrait({ character, size = 56 }: { character: Character; size?
   const painting = status === 'pending';
   const failed = status === 'failed' && !character.portraitAssetId;
   const id = character.portraitAssetId;
+  const src = id ? imageUrl(roomId, id, media.version.get(id)) : null;
+  const [broken, setBroken] = useState<string | null>(null);
   return (
     <div
       className="relative flex shrink-0 items-center justify-center overflow-hidden rounded-[var(--t-radius)] border-2 border-line bg-raised heading font-bold text-muted"
@@ -70,7 +72,11 @@ export function Portrait({ character, size = 56 }: { character: Character; size?
       data-testid="portrait"
       data-state={id ? 'ready' : painting ? 'painting' : failed ? 'failed' : 'none'}
     >
-      {id ? <img src={imageUrl(roomId, id)} alt={`Portrait of ${character.name}`} className="h-full w-full object-cover" loading="lazy" /> : <span aria-hidden="true">{initials}</span>}
+      {src && broken !== src ? (
+        <img src={src} alt={`Portrait of ${character.name}`} className="h-full w-full object-cover" loading="lazy" onError={() => setBroken(src)} />
+      ) : (
+        <span aria-hidden="true">{initials}</span>
+      )}
       {painting && (
         <span className="absolute inset-0 flex animate-pulse items-center justify-center bg-black/45 text-[10px] font-normal text-white" style={{ fontSize: Math.max(9, size * 0.16) }}>
           painting…

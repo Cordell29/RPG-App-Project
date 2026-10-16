@@ -14,11 +14,13 @@ export interface MediaIndex {
   latestScene: string | null;
   /** AI-voice clip per narration seq. */
   voice: Map<number, string>;
+  /** Seq of the latest image_ready per asset; changes when a missing file is repainted. */
+  version: Map<string, number>;
 }
 
 /** Folds image/audio events into lookups the UI needs. Pure, so it is cheap to memoise. */
 export function buildMedia(events: GameEvent[]): MediaIndex {
-  const m: MediaIndex = { status: new Map(), portraitRequest: new Map(), byTurn: new Map(), latestScene: null, voice: new Map() };
+  const m: MediaIndex = { status: new Map(), portraitRequest: new Map(), byTurn: new Map(), latestScene: null, voice: new Map(), version: new Map() };
   for (const e of events) {
     if (e.type === 'image_requested') {
       const { assetId, kind, subject, characterId } = e.payload;
@@ -30,14 +32,18 @@ export function buildMedia(events: GameEvent[]): MediaIndex {
         list.push({ assetId, kind, subject });
         m.byTurn.set(e.turnId, list);
       }
-    } else if (e.type === 'image_ready') m.status.set(e.payload.assetId, 'ready');
+    } else if (e.type === 'image_ready') {
+      m.status.set(e.payload.assetId, 'ready');
+      m.version.set(e.payload.assetId, e.seq);
+    }
     else if (e.type === 'image_failed') m.status.set(e.payload.assetId, 'failed');
     else if (e.type === 'audio_ready') m.voice.set(e.payload.narrationSeq, e.payload.assetId);
   }
   return m;
 }
 
-export const imageUrl = (roomId: string, assetId: string) => `/assets/${encodeURIComponent(roomId)}/${encodeURIComponent(assetId)}.webp`;
+export const imageUrl = (roomId: string, assetId: string, version?: number) =>
+  `/assets/${encodeURIComponent(roomId)}/${encodeURIComponent(assetId)}.webp${version ? `?v=${version}` : ''}`;
 export const voiceUrl = (roomId: string, assetId: string) => `/assets/${encodeURIComponent(roomId)}/${encodeURIComponent(assetId)}.wav`;
 
 export function useMedia(): MediaIndex {

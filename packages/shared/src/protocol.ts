@@ -4,6 +4,7 @@ import { CharacterCreateSchema } from './character.ts';
 import { RECHARGES } from './constants.ts';
 import { type GameEvent, HostOverrideSchema } from './events.ts';
 import { AbilitySchema, ItemSchema } from './state.ts';
+import { StartChoiceSchema } from './start.ts';
 import type { RoomSettings } from './room.ts';
 import type { GameState } from './state.ts';
 
@@ -101,6 +102,12 @@ export const CommandSchema = z.discriminatedUnion('type', [
     /** The 5e/Starforged feature or spell it is comparable to (shown to the host). */
     basis: z.string().trim().max(300).optional(),
   }),
+  /** Host, before the first turn: re-roll, pick or write the starting location. */
+  z.object({ commandId, type: z.literal('set_start'), start: StartChoiceSchema }),
+  /** Host: replay every event from scratch and replace the cached snapshot (desync recovery). */
+  z.object({ commandId, type: z.literal('rebuild_state') }),
+  /** Host: repaint images whose files are missing (e.g. after importing without images). */
+  z.object({ commandId, type: z.literal('repaint_missing') }),
   z.object({
     commandId,
     type: z.literal('host_override'),
@@ -123,6 +130,9 @@ export const HOST_COMMANDS: readonly CommandType[] = [
   'write_recap',
   'set_ai_voice',
   'resolve_approval',
+  'set_start',
+  'rebuild_state',
+  'repaint_missing',
 ];
 
 /** Ephemeral GM status, broadcast to the room (not stored). */
@@ -165,6 +175,8 @@ export interface ServerToClientEvents {
   turn_status: (status: TurnStatus) => void;
   /** Streamed narration text (delta) for the turn being narrated. */
   narration_chunk: (msg: { turnId: string; delta: string }) => void;
+  /** State was rebuilt on the server: drop the local log and resync from seq 0. */
+  reset: () => void;
 }
 
 export interface ClientToServerEvents {

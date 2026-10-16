@@ -19,6 +19,7 @@ import {
   findRole,
   parseDice,
   rollDice,
+  resolveStart,
   rollStatPool,
 } from '@tavern/shared';
 import { and, eq, lt } from 'drizzle-orm';
@@ -42,11 +43,15 @@ export interface TurnHooks {
 export interface MediaHooks {
   quota(roomId: string, state: GameState, events: GameEvent[]): { remainingToday: number; sceneAllowed: boolean };
   portraitsThisSession(events: GameEvent[], characterId: string): number;
+  /** Re-queues images whose files are missing; returns how many. */
+  repaintMissing(roomId: string): number;
 }
 
 export interface MemoryHooks {
   recap(roomId: string, sessionNumber: number): void;
   syncCanon(roomId: string): void;
+  /** Rewrites the chapter and canon tables from the event log. */
+  rebuildDerived(roomId: string): void;
 }
 
 class CommandRejected extends Error {}
@@ -65,6 +70,8 @@ export class CommandBus {
   private readonly random: RandomInt;
   onEvents: (roomId: string, events: GameEvent[]) => void = () => {};
   onSettings: (roomId: string, settings: RoomSettings) => void = () => {};
+  /** State was rebuilt: clients must drop their logs and resync from 0. */
+  onReset: (roomId: string) => void = () => {};
   /** GM turn control, wired by the app once the TurnRunner exists. */
   turns: TurnHooks | null = null;
   memory: MemoryHooks | null = null;
@@ -106,6 +113,13 @@ export class CommandBus {
       try {
         if (cmd.type === 'set_room_mode') {
           newSettings = this.setMode(player.roomId, { mode: cmd.mode });
+        } else if (cmd.type === 'rebuild_state') {
+          if (this.turns && this.turns.status(player.roomId).status !== 'idle' && this.turns.status(player.roomId).status !== 'failed') {
+            reject('Wait for the GM to finish the current turn.');
+          }
+          this.store.rebuild(player.roomId);
+          this.memory?.rebuildDerived(player.roomId);
+          this.after.push(() => this.onReset(player.roomId));
         } else if (cmd.type === 'set_ai_voice') {
           newSettings = this.setMode(player.roomId, { aiVoice: cmd.on });
         } else if (cmd.type === 'set_turn_mode') {
@@ -166,7 +180,7 @@ export class CommandBus {
     return next;
   }
 
-  private toEvents(player: AuthedPlayer, cmd: Exclude<Command, { type: 'set_room_mode' | 'set_turn_mode' | 'set_ai_voice' }>): EventDraft[] {
+  private toEvents(player: AuthedPlayer, cmd: Exclude<Command, { type: 'set_room_mode' | 'set_turn_mode' | 'set_ai_voice' | 'rebuild_state' }>): EventDraft[] {
     const base = { actorId: player.playerId, turnId: null };
     const state = this.store.getState(player.roomId);
     const me = state.players.find((p) => p.id === player.playerId);
@@ -289,6 +303,23 @@ export class CommandBus {
         if (!state.session.active) reject('No session is running.');
         this.after.push(() => this.memory?.recap(player.roomId, state.session.number));
         return [{ ...base, type: 'session_ended', payload: { number: state.session.number } }];
+
+      case 'set_start': {
+        if (state.turn.number > 0 || state.turn.phase === 'resolving') reject('The story has already begun; the starting location is fixed.');
+        try {
+          const start = resolveStart(state.setting, cmd.start, this.random, state.opening?.title);
+          return [{ ...base, type: 'start_set', payload: { start } }];
+        } catch (err) {
+          reject((err as Error).message);
+        }
+      }
+
+      case 'repaint_missing': {
+        if (!this.media) reject('Images are not available.');
+        const roomId = player.roomId;
+        this.after.push(() => this.media?.repaintMissing(roomId));
+        return [];
+      }
 
       case 'write_recap': {
         if (state.session.number === 0) reject('Start a session first.');

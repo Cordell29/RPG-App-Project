@@ -128,6 +128,20 @@ export class AssetService {
     return all.filter((e) => e.seq > since && e.seq !== first).length;
   }
 
+  /** Images that were never painted here (imported without data, or failed): queue them again. */
+  repaintMissing(roomId: string): number {
+    const rows = this.d.db
+      .select()
+      .from(assets)
+      .where(and(eq(assets.roomId, roomId), eq(assets.status, 'failed'), sql`${assets.kind} != 'voice'`))
+      .all();
+    for (const r of rows) {
+      this.d.db.update(assets).set({ status: 'pending', attempts: 0, error: null }).where(eq(assets.id, r.id)).run();
+      this.enqueue(r.id);
+    }
+    return rows.length;
+  }
+
   // ── reacting to committed events ────────────────────────────────────────
 
   /** Called with every batch of committed events: creates and queues jobs. */
@@ -208,13 +222,20 @@ export class AssetService {
       const path = join(this.dir(row.roomId), `${row.id}.webp`);
       writeFileSync(path, webp);
       this.finish(row, path, COST_CENTS.image);
-      const req = this.d.store.loadEvents(row.roomId).find((e) => e.type === 'image_requested' && e.payload.assetId === row.id);
+      const log = this.d.store.loadEvents(row.roomId);
+      const req = log.find((e) => e.type === 'image_requested' && e.payload.assetId === row.id);
+      const repaint = log.some((e) => e.type === 'image_ready' && e.payload.assetId === row.id);
       const characterId = req?.type === 'image_requested' ? req.payload.characterId : undefined;
       const state = this.d.store.getState(row.roomId);
       const stillThere = !characterId || state.party.some((c) => c.id === characterId);
-      if (stillThere) {
+      if (stillThere || repaint) {
         this.commit(row.roomId, [
-          { type: 'image_ready', actorId: null, turnId: null, payload: { assetId: row.id, kind: row.kind as ImageKind, ...(characterId ? { characterId } : {}) } },
+          {
+            type: 'image_ready',
+            actorId: null,
+            turnId: null,
+            payload: { assetId: row.id, kind: row.kind as ImageKind, ...(characterId ? { characterId } : {}), ...(repaint ? { repaint: true } : {}) },
+          },
         ]);
       }
     } finally {

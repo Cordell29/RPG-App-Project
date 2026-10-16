@@ -3,10 +3,14 @@ import {
   type RoomSettings,
   type SettingPreset,
   RoomSettingsSchema,
+  type RandomInt,
   SettingPresetSchema,
+  StartChoiceSchema,
   defaultRoomSettings,
+  resolveStart,
   normalizeInviteCode,
 } from '@tavern/shared';
+import { randomInt } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { hashToken, newId, newInviteCode, newRoomId, newToken } from './auth.ts';
@@ -30,8 +34,10 @@ export const CreateRoomSchema = z.object({
   hostName: z.string().trim().min(1).max(40),
   setting: SettingPresetSchema,
   mode: z.enum(['solo', 'group']),
+  /** Where the story opens: rolled on the setting's table unless the host picks or writes one. */
+  start: StartChoiceSchema.default({ kind: 'random' }),
 });
-export type CreateRoomInput = z.infer<typeof CreateRoomSchema>;
+export type CreateRoomInput = z.input<typeof CreateRoomSchema>;
 
 export const DisplayNameSchema = z.string().trim().min(1).max(40);
 
@@ -56,19 +62,28 @@ export class RoomService {
   /** Called after events are committed (wired to the socket broadcaster). */
   onEvents: (roomId: string, events: GameEvent[]) => void = () => {};
 
-  constructor(db: Db, store: EventStore) {
+  private readonly random: RandomInt;
+
+  constructor(db: Db, store: EventStore, random: RandomInt = randomInt) {
     this.db = db;
     this.store = store;
+    this.random = random;
   }
 
   createRoom(input: CreateRoomInput): Credentials & { hostToken: string; inviteCode: string } {
-    const { roomName, hostName, setting, mode } = CreateRoomSchema.parse(input);
+    const { roomName, hostName, setting, mode, start: choice } = CreateRoomSchema.parse(input);
+    let start;
+    try {
+      start = resolveStart(setting, choice, this.random);
+    } catch (err) {
+      throw new RoomError((err as Error).message);
+    }
     const roomId = newRoomId();
     const hostToken = newToken();
     const playerId = newId();
     const token = newToken();
     const now = new Date().toISOString();
-    const inviteCode = this.uniqueInviteCode();
+    const inviteCode = this.newInviteCode();
     const events = this.db.$client.transaction(() => {
       this.db
         .insert(rooms)
@@ -93,6 +108,7 @@ export class RoomService {
           turnId: null,
           payload: { player: { id: playerId, displayName: hostName, isHost: true } },
         },
+        { type: 'start_set', actorId: playerId, turnId: null, payload: { start } },
       ]);
     })();
     this.onEvents(roomId, events);
@@ -144,6 +160,25 @@ export class RoomService {
     return { roomId, playerId: host.id, token };
   }
 
+  /**
+   * Host: a rejoin link for a seat (a player who lost their browser data, or everyone after an
+   * import). Issues a fresh token for that player, signing out their old devices.
+   */
+  issueSeatToken(roomId: string, playerId: string): string {
+    const row = this.db.select().from(players).where(and(eq(players.id, playerId), eq(players.roomId, roomId))).get();
+    if (!row) throw new RoomError('That player is not in this room.', 404);
+    const token = newToken();
+    this.db.update(players).set({ tokenHash: hashToken(token) }).where(eq(players.id, playerId)).run();
+    return token;
+  }
+
+  /** Redeems a rejoin link once: the link's token is replaced by a new one only this browser knows. */
+  claimSeat(roomId: string, playerId: string, token: string): Credentials {
+    const who = this.authenticate(roomId, token);
+    if (!who || who.playerId !== playerId) throw new RoomError('That rejoin link has expired or was already used. Ask the host for a new one.', 403);
+    return { roomId, playerId, token: this.issueSeatToken(roomId, playerId) };
+  }
+
   authenticate(roomId: string, token: string): AuthedPlayer | null {
     const row = this.db
       .select()
@@ -188,7 +223,8 @@ export class RoomService {
     };
   }
 
-  private uniqueInviteCode(): string {
+  /** A fresh invite code no other room uses. */
+  newInviteCode(): string {
     for (let i = 0; i < 20; i++) {
       const code = newInviteCode();
       if (!this.findByInvite(code)) return code;

@@ -23,7 +23,7 @@ test('portrait, scene illustration, AI voice and the Markdown download', async (
   await page.getByLabel('AI voice').click();
   await expect(page.getByLabel('AI voice')).toBeChecked(); // controlled: flips once the server broadcasts settings
   await page.getByLabel(/What does Ayla do\?/).fill('I listen at the door.');
-  await page.getByRole('button', { name: 'Act' }).click();
+  await page.getByRole('button', { name: 'Act', exact: true }).click();
   const speak = page.getByTestId('story-feed').getByRole('button', { name: 'Read aloud' }).first();
   await expect(speak).toHaveAttribute('data-voice', 'ai');
 

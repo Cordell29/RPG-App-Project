@@ -5,6 +5,8 @@ export interface Config {
   host: string;
   dataDir: string;
   dbFile: string;
+  backupDir: string;
+  backupKeepDays: number;
   webDist: string | null;
   rulesLookup: boolean;
   anthropic: { apiKey: string; turnModel: string; summaryModel: string } | null;
@@ -21,6 +23,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     host: env.HOST ?? '0.0.0.0',
     dataDir,
     dbFile: env.DB_FILE ?? join(dataDir, 'tavern.db'),
+    backupDir: env.BACKUP_DIR ?? join(dataDir, 'backups'),
+    backupKeepDays: Math.max(1, Number(env.BACKUP_KEEP_DAYS ?? 14) || 14),
     webDist: env.WEB_DIST ?? new URL('../../web/dist/', import.meta.url).pathname,
     rulesLookup: (env.GM_RULES_LOOKUP ?? 'on').toLowerCase() !== 'off',
     anthropic: apiKey

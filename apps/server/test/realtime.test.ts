@@ -244,19 +244,19 @@ describe('realtime sync', () => {
     const bea = (await post<Creds>(`/api/rooms/${room.roomId}/join`, { displayName: 'Bea' })).body;
     const host = new TestClient(room);
     const guest = new TestClient(bea);
-    await host.until(() => host.log.lastSeq === 3);
-    await guest.until(() => guest.log.lastSeq === 3);
+    await host.until(() => host.log.lastSeq === 4);
+    await guest.until(() => guest.log.lastSeq === 4);
     expect(guest.syncs[0]).toMatchObject({ mode: 'events', inviteCode: room.inviteCode, you: { isHost: false } });
 
     expect(await host.command({ commandId: cid(), type: 'send_chat', text: 'Welcome!' })).toMatchObject({ ok: true });
     expect(await guest.command({ commandId: cid(), type: 'roll_dice', notation: '1d20+3', reason: 'perception' })).toEqual({
       ok: true,
-      seqs: [5],
+      seqs: [6],
     });
-    await host.until(() => host.log.lastSeq === 5);
-    await guest.until(() => guest.log.lastSeq === 5);
+    await host.until(() => host.log.lastSeq === 6);
+    await guest.until(() => guest.log.lastSeq === 6);
     expect(host.log.events).toEqual(guest.log.events);
-    const roll = host.log.events[4]!;
+    const roll = host.log.events[5]!;
     expect(roll.type).toBe('dice_rolled');
     if (roll.type === 'dice_rolled') {
       expect(roll.actorId).toBe(bea.playerId);
@@ -283,7 +283,7 @@ describe('realtime sync', () => {
     const bea = (await post<Creds>(`/api/rooms/${room.roomId}/join`, { displayName: 'Bea' })).body;
     const host = new TestClient(room);
     const guest = new TestClient(bea);
-    await guest.until(() => guest.log.lastSeq === 3);
+    await guest.until(() => guest.log.lastSeq === 4);
     await host.command({ commandId: cid(), type: 'send_chat', text: 'before' });
     await guest.until(() => guest.chats().length === 1);
 
@@ -299,14 +299,14 @@ describe('realtime sync', () => {
 
     expect(guest.chats()).toEqual(['before', 'missed 0', 'missed 1', 'missed 2', 'missed 3', 'missed 4', 'back!']);
     expect(guest.log.events.map((e) => e.seq)).toEqual(host.log.events.map((e) => e.seq));
-    expect(guest.syncs.at(-1)!.events.map((e) => e.seq)).toEqual([5, 6, 7, 8, 9, 10]);
+    expect(guest.syncs.at(-1)!.events.map((e) => e.seq)).toEqual([6, 7, 8, 9, 10, 11]);
     expect(guest.log.state).toEqual(t.store.getState(room.roomId));
   });
 
   it('recovers from a seq gap by requesting a resync', async () => {
     const room = await createRoom();
     const host = new TestClient(room);
-    await host.until(() => host.log.lastSeq === 2);
+    await host.until(() => host.log.lastSeq === 3);
     // Commit events without broadcasting them, so the client sees a gap on the next one.
     t.store.append(room.roomId, [
       { type: 'chat_message', actorId: room.playerId, turnId: null, payload: { playerId: room.playerId, text: 'silent' } },
@@ -319,20 +319,20 @@ describe('realtime sync', () => {
   it('a retried command is applied once and returns the original result', async () => {
     const room = await createRoom();
     const host = new TestClient(room);
-    await host.until(() => host.log.lastSeq === 2);
+    await host.until(() => host.log.lastSeq === 3);
     const cmd: Command = { commandId: cid(), type: 'roll_dice', notation: '1d20' };
     const first = await host.command(cmd);
     const second = await host.command(cmd);
     const third = await host.command({ ...cmd, notation: '100d6' }); // same id, different body: still the original
     expect(second).toEqual(first);
     expect(third).toEqual(first);
-    expect(t.store.getState(room.roomId).seq).toBe(3);
+    expect(t.store.getState(room.roomId).seq).toBe(4);
   });
 
   it('invalid dice and chat are refused without writing events', async () => {
     const room = await createRoom();
     const host = new TestClient(room);
-    await host.until(() => host.log.lastSeq === 2);
+    await host.until(() => host.log.lastSeq === 3);
     const bad = await host.command({ commandId: cid(), type: 'roll_dice', notation: '2d6 adv' });
     expect(bad).toEqual({ ok: false, error: 'Advantage and disadvantage apply to a single d20 only.' });
     const long = await host.command({ commandId: cid(), type: 'send_chat', text: 'x'.repeat(1001) });
@@ -341,7 +341,7 @@ describe('realtime sync', () => {
       (host.socket as unknown as { emit: (...a: unknown[]) => void }).emit('command', { type: 'drop_tables' }, r),
     );
     expect(junk.ok).toBe(false);
-    expect(t.store.getState(room.roomId).seq).toBe(2);
+    expect(t.store.getState(room.roomId).seq).toBe(3);
   });
 
   it('sends the latest snapshot plus tail when more than 500 events behind', async () => {
@@ -354,18 +354,18 @@ describe('realtime sync', () => {
     });
     t.store.append(room.roomId, Array.from({ length: 610 }, (_, i) => chat(i)));
     const host = new TestClient(room);
-    await host.until(() => host.log.lastSeq === 612);
+    await host.until(() => host.log.lastSeq === 613);
     const sync = host.syncs[0]!;
     expect(sync.mode).toBe('snapshot');
     expect(sync.snapshot!.seq).toBe(600);
-    expect(sync.events.map((e) => e.seq)).toEqual(Array.from({ length: 12 }, (_, i) => 601 + i));
+    expect(sync.events.map((e) => e.seq)).toEqual(Array.from({ length: 13 }, (_, i) => 601 + i));
     expect(host.log.state).toEqual(t.store.getState(room.roomId));
   });
 
   it('only the host can switch a solo game to group play', async () => {
     const room = await createRoom('solo');
     const host = new TestClient(room);
-    await host.until(() => host.log.lastSeq === 2);
+    await host.until(() => host.log.lastSeq === 3);
     const seen: string[] = [];
     host.socket.on('settings', (s) => seen.push(s.mode));
     expect((await post(`/api/rooms/${room.roomId}/join`, { displayName: 'Bea' })).status).toBe(403);
@@ -384,7 +384,7 @@ describe('realtime sync', () => {
   it('broadcasts joins to players already in the room', async () => {
     const room = await createRoom();
     const host = new TestClient(room);
-    await host.until(() => host.log.lastSeq === 2);
+    await host.until(() => host.log.lastSeq === 3);
     await post(`/api/rooms/${room.roomId}/join`, { displayName: 'Late Larry' });
     await host.until(() => host.log.state.players.length === 2);
     expect(host.log.state.players[1]!.displayName).toBe('Late Larry');

@@ -13,7 +13,7 @@ import {
   SKILL_KEYS,
   STAT_KEYS,
 } from './constants.ts';
-import { SettingPresetSchema } from './preset.ts';
+import { SettingPresetSchema, StartSchema } from './preset.ts';
 
 export const IdSchema = z.string().min(1).max(LIMITS.idLength);
 
@@ -95,6 +95,9 @@ export const SceneSchema = z.object({
 });
 export type Scene = z.infer<typeof SceneSchema>;
 
+export const OpeningSchema = StartSchema.extend({ source: z.enum(['random', 'picked', 'custom']) });
+export type Opening = z.infer<typeof OpeningSchema>;
+
 export const QuestSchema = z.object({
   key: z.string().min(1).max(60),
   title: z.string().min(1).max(120),
@@ -164,6 +167,8 @@ export const GameStateSchema = z.object({
   /** Spotlight mode: the only player who may act; null = anyone (Round mode). */
   spotlight: IdSchema.nullable(),
   session: z.object({ number: z.number().int().min(0), active: z.boolean() }),
+  /** Where the campaign opens (rolled, picked or written by the host). Null in older rooms. */
+  opening: OpeningSchema.nullable().default(null),
 });
 export type GameState = z.infer<typeof GameStateSchema>;
 
@@ -183,5 +188,6 @@ export function initialState(): GameState {
     pendingApprovals: [],
     spotlight: null,
     session: { number: 0, active: false },
+    opening: null,
   };
 }

@@ -12,6 +12,7 @@ import { draftCharacter } from './llm/characterDraft.ts';
 import { draftSetting } from './llm/settingDraft.ts';
 import { TurnRunner } from './gm/turns.ts';
 import { ASSET_FILE_RE, AssetService } from './media/assets.ts';
+import { IMPORT_BODY_LIMIT, exportCampaign, importCampaign } from './backup/campaign.ts';
 import { MockImageProvider, MockTtsProvider } from './media/mock.ts';
 import type { ImageProvider, TtsProvider } from './media/provider.ts';
 import { Chronicler } from './memory/chronicle.ts';
@@ -48,7 +49,7 @@ export interface TavernApp {
 export async function buildApp(deps: AppDeps): Promise<TavernApp> {
   const app = Fastify({ logger: deps.logger ?? false, trustProxy: true, bodyLimit: 64 * 1024 });
   const store = new EventStore(deps.db, { reducer: { unknown: 'skip', onUnknown: (e) => app.log.error(e, 'unknown event') } });
-  const rooms = new RoomService(deps.db, store);
+  const rooms = new RoomService(deps.db, store, deps.random);
   const commands = new CommandBus(deps.db, store);
 
   app.setErrorHandler((err, _req, reply) => {
@@ -114,6 +115,47 @@ export async function buildApp(deps: AppDeps): Promise<TavernApp> {
     const { description, characterId } = z.object({ description: z.string(), characterId: z.string() }).parse(req.body);
     const state = store.getState(roomId);
     return draftAbility(deps.llm, state.setting, state.party.find((c) => c.id === characterId) ?? null, description, deps.rulesLookup ?? true);
+  });
+
+  const requireHost = (req: { params: unknown; headers: { authorization?: string } }) => {
+    const roomId = (req.params as { roomId: string }).roomId;
+    const token = (req.headers.authorization ?? '').replace(/^Bearer\s+/i, '');
+    const who = token ? rooms.authenticate(roomId, token) : null;
+    if (!who) throw new RoomError('Sign in to this room first.', 401);
+    if (!who.isHost) throw new RoomError('Only the host can do that.', 403);
+    return who;
+  };
+  const campaignDeps = () => ({ db: deps.db, store, rooms, memory, assetDir: (roomId: string) => assets.dir(roomId) });
+
+  /** Host: the whole campaign as one JSON file (?images=1 embeds the pictures). */
+  app.get('/api/rooms/:roomId/export', async (req, reply) => {
+    const who = requireHost(req);
+    const images = (req.query as { images?: string }).images === '1';
+    const file = exportCampaign(campaignDeps(), who.roomId, { images });
+    const slug = file.room.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'campaign';
+    return reply
+      .header('Content-Disposition', `attachment; filename="${slug}-${file.exportedAt.slice(0, 10)}.tavern.json"`)
+      .header('Cache-Control', 'no-store')
+      .send(file);
+  });
+
+  /** Import a campaign file into a brand-new room; the importer becomes its host. */
+  app.post('/api/import', { bodyLimit: IMPORT_BODY_LIMIT }, async (req) => {
+    const { file } = z.object({ file: z.unknown() }).parse(req.body);
+    const res = importCampaign(campaignDeps(), file);
+    return res;
+  });
+
+  /** Host: a one-time rejoin link for a seat. */
+  app.post('/api/rooms/:roomId/seat-link', async (req) => {
+    const who = requireHost(req);
+    const { playerId } = z.object({ playerId: z.string().min(1).max(64) }).parse(req.body);
+    return { playerId, token: rooms.issueSeatToken(who.roomId, playerId) };
+  });
+
+  app.post('/api/rooms/:roomId/claim-seat', async (req) => {
+    const { playerId, token } = z.object({ playerId: z.string().min(1).max(64), token: z.string().min(16).max(128) }).parse(req.body);
+    return rooms.claimSeat((req.params as { roomId: string }).roomId, playerId, token);
   });
 
   app.post('/api/rooms/:roomId/claim-host', async (req) => {

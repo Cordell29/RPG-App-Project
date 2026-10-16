@@ -11,6 +11,7 @@ import {
   IdSchema,
   ItemSchema,
   PlayerSchema,
+  OpeningSchema,
   SceneSchema,
   SkillKeySchema,
   StatKeySchema as StatKey,
@@ -49,6 +50,7 @@ export const EVENT_TYPES = [
   'session_recap',
   'image_failed',
   'audio_ready',
+  'start_set',
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
@@ -201,6 +203,8 @@ export const PAYLOAD_SCHEMAS = {
     assetId: IdSchema,
     kind: z.enum(['portrait', 'scene', 'npc']),
     characterId: IdSchema.optional(),
+    /** A missing file was repainted: clients reload the picture; state does not change. */
+    repaint: z.boolean().optional(),
   }),
   chapter_closed: z.object({
     chapterNo: z.number().int().min(1),
@@ -221,6 +225,7 @@ export const PAYLOAD_SCHEMAS = {
   session_ended: z.object({ number: z.number().int().min(1) }),
   image_failed: z.object({ assetId: IdSchema, reason: z.string().max(300) }),
   audio_ready: z.object({ assetId: IdSchema, narrationSeq: z.number().int().positive() }),
+  start_set: z.object({ start: OpeningSchema }),
   session_recap: z.object({ number: z.number().int().min(1), text: z.string().min(1).max(4000) }),
   approval_requested: z.object({ approval: ApprovalSchema }),
   approval_resolved: z.object({
@@ -279,6 +284,7 @@ export const GameEventSchema = z.discriminatedUnion('type', [
   eventSchema('session_recap'),
   eventSchema('image_failed'),
   eventSchema('audio_ready'),
+  eventSchema('start_set'),
 ]);
 export type GameEvent = z.infer<typeof GameEventSchema>;
 export type EventOf<T extends EventType> = Extract<GameEvent, { type: T }>;

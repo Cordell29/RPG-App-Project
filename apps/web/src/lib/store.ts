@@ -114,6 +114,12 @@ export const useRoom = create<RoomStore>((set, get) => {
       socket.on('presence', ({ online }) => set({ online }));
       socket.on('settings', (settings) => set({ settings }));
       socket.on('turn_status', (turnStatus) => set({ turnStatus }));
+      // The host rebuilt state on the server: start over from seq 0.
+      socket.on('reset', () => {
+        log = new ClientLog();
+        publish();
+        resync(0);
+      });
       socket.on('narration_chunk', ({ turnId, delta }) => {
         const cur = get().streaming;
         set({ streaming: { turnId, text: (cur?.turnId === turnId ? cur.text : '') + delta } });

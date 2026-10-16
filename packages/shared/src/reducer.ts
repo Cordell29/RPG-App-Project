@@ -176,8 +176,18 @@ export function apply(state: GameState, event: GameEvent, options: ApplyOptions 
       s.scene = structuredClone(event.payload.scene);
       break;
 
+    case 'start_set': {
+      if (s.turn.number > 0) fail('the campaign has already begun; the starting location is fixed');
+      const start = structuredClone(event.payload.start);
+      s.opening = start;
+      const key = start.title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 80);
+      s.scene = { locationKey: key || 'start', title: start.title, description: start.description };
+      break;
+    }
+
     case 'image_ready': {
-      const { kind, assetId, characterId } = event.payload;
+      const { kind, assetId, characterId, repaint } = event.payload;
+      if (repaint) break;
       if (kind === 'portrait') getChar(characterId ?? fail('portrait needs characterId')).portraitAssetId = assetId;
       else if (kind === 'scene') s.scene.imageAssetId = assetId;
       break;

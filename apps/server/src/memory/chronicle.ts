@@ -47,6 +47,19 @@ interface TurnSlice {
  * Runs after turns, in the background, one job at a time per room; failures are retried on
  * the next turn because "is a chapter due?" is recomputed from the log every time.
  */
+/** chapter_closed events carry everything a chapter row holds, so the table can be rebuilt from them. */
+export function rebuildChapterTable(db: Db, roomId: string, events: GameEvent[]) {
+  db.$client.transaction(() => {
+    db.delete(chronicleChapters).where(eq(chronicleChapters.roomId, roomId)).run();
+    for (const e of events) {
+      if (e.type !== 'chapter_closed') continue;
+      const { level, chapterNo, fromSeq, toSeq, summary } = e.payload;
+      if (!summary) continue;
+      db.insert(chronicleChapters).values({ roomId, level, chapterNo, fromSeq, toSeq, summary, createdAt: e.createdAt }).onConflictDoNothing().run();
+    }
+  })();
+}
+
 export class Chronicler {
   private readonly chains = new Map<string, Promise<void>>();
   private readonly db: Db;
@@ -109,6 +122,12 @@ export class Chronicler {
   /** Keep the canon table (a cache of the event log) in step; call after canon changes or rewinds. */
   syncCanon(roomId: string) {
     syncCanonTable(this.db, roomId, this.canon(roomId));
+  }
+
+  /** Rewrites the chapter and canon tables from the event log (import, "Rebuild state"). */
+  rebuildDerived(roomId: string) {
+    rebuildChapterTable(this.db, roomId, this.store.loadEvents(roomId));
+    this.syncCanon(roomId);
   }
 
   // ── chapters ────────────────────────────────────────────────────────────
