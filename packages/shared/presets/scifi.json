@@ -1,0 +1,28 @@
+{
+  "key": "scifi",
+  "name": "Sci-fi",
+  "tone": "Gritty space frontier: worn ships, thin margins, corporate power and hard choices.",
+  "currencyName": "credits",
+  "statLabels": {
+    "str": "Might",
+    "dex": "Reflex",
+    "con": "Grit",
+    "int": "Tech",
+    "wis": "Insight",
+    "cha": "Presence"
+  },
+  "roles": [
+    { "name": "Soldier", "summary": "A combat veteran who knows how to take and hold ground.", "startingKit": ["Carbine", "Armoured vest", "Combat knife", "Med-patch"] },
+    { "name": "Pilot", "summary": "A hotshot flyer who can thread a ship through anything.", "startingKit": ["Sidearm", "Flight jacket", "Nav-slate", "Lucky charm"] },
+    { "name": "Engineer", "summary": "A fixer who keeps failing machines alive with tape and genius.", "startingKit": ["Multitool", "Welding torch", "Spare power cells", "Diagnostic scanner"] },
+    { "name": "Medic", "summary": "A field doctor who patches crew up under fire.", "startingKit": ["Trauma kit", "Stim injector", "Stunner", "Bio-scanner"] },
+    { "name": "Scout", "summary": "A recon specialist who goes first and sees everything.", "startingKit": ["Long rifle", "Optic visor", "Climbing rig", "Survival pack"] },
+    { "name": "Envoy", "summary": "A negotiator who opens doors that guns cannot.", "startingKit": ["Holdout pistol", "Formal suit", "Translator earpiece", "Credit chit"] }
+  ],
+  "openingHooks": [
+    "Your freighter answers a distress call from a mining station that went silent three weeks ago, and the docking clamps engage on their own.",
+    "A corporate fixer offers triple pay to smuggle a sealed cryo-pod past a navy blockade, no questions asked.",
+    "The colony's terraforming engine has started broadcasting a message in a language no one recognises."
+  ],
+  "artStyle": "Painterly science-fiction concept illustration in the style of a roleplaying sourcebook. Realistic proportions, worn practical equipment, dramatic rim lighting, visible brushwork, rich but slightly muted colours."
+}

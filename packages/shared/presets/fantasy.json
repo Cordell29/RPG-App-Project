@@ -1,0 +1,28 @@
+{
+  "key": "fantasy",
+  "name": "Fantasy",
+  "tone": "Heroic high fantasy: brave deeds, ancient magic, wonder with real danger.",
+  "currencyName": "gold",
+  "statLabels": {
+    "str": "Strength",
+    "dex": "Dexterity",
+    "con": "Constitution",
+    "int": "Intelligence",
+    "wis": "Wisdom",
+    "cha": "Charisma"
+  },
+  "roles": [
+    { "name": "Fighter", "summary": "A trained warrior who holds the line with steel and grit.", "startingKit": ["Longsword", "Shield", "Chain shirt", "Rations (3 days)"] },
+    { "name": "Rogue", "summary": "A quick, quiet specialist in locks, traps and knives in the dark.", "startingKit": ["Shortsword", "Dagger", "Thieves' tools", "Dark hooded cloak"] },
+    { "name": "Wizard", "summary": "A scholar of the arcane who bends reality with study and will.", "startingKit": ["Quarterstaff", "Spellbook", "Component pouch", "Ink and quill"] },
+    { "name": "Cleric", "summary": "A servant of a higher power who heals, wards and smites.", "startingKit": ["Mace", "Holy symbol", "Healer's kit", "Scale mail"] },
+    { "name": "Ranger", "summary": "A wilderness tracker and archer at home far from roads.", "startingKit": ["Longbow", "Quiver of arrows", "Hunting knife", "Bedroll"] },
+    { "name": "Bard", "summary": "A performer whose stories and songs carry real power.", "startingKit": ["Lute", "Rapier", "Fine clothes", "Letter of introduction"] }
+  ],
+  "openingHooks": [
+    "A dying courier stumbles into the tavern and presses a sealed map into your hands before the hooded riders arrive.",
+    "The village well has started whispering at night, and the children who listen stop speaking by morning.",
+    "The duke offers a fortune to anyone who will escort his estranged daughter through the haunted Greywood before the solstice."
+  ],
+  "artStyle": "Painterly digital illustration in the style of a modern fantasy roleplaying sourcebook. Realistic proportions, detailed costume and gear, dramatic rim lighting, visible brushwork, rich but slightly muted colours."
+}
