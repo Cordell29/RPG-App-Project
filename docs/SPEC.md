@@ -482,3 +482,26 @@ Voice *input* stays out of scope. Narration can be read aloud:
   - **Round (default).** Everyone writes an action; submitted actions are visible to the table and editable until the round resolves; the round resolves when all active players have acted, after the timer (default 60 s in group, off in solo), or when the host presses Resolve. The GM resolves all actions together in one call, so it can reconcile overlapping or contradictory actions in a single coherent outcome.
   - **Spotlight.** Strict rotation: only the player in the spotlight can submit; the GM resolves that one action, then the spotlight passes. Good for big decisions or when players keep talking over each other.
 - New event types: `action_edited`, `action_withdrawn` (Round mode edits before resolve).
+
+### A9. Contested checks (5e-style)
+
+When two creatures' actions directly oppose each other (two players grabbing the same key, a shove against a brace, sneaking past a guard's perception), the GM resolves it as a **contest**, as in D&D 5e:
+- Each side rolls d20 + the relevant stat modifier (advantage/disadvantage as normal). The rolls happen on the server.
+- The higher total wins. On a tie, the situation stays as it was before the contest (the defender / status quo wins); if there is no status quo, it stays unresolved and the GM may call for a re-roll.
+- Engine: `rollContest()` in packages/shared (Phase 3, tested). GM tool `request_contest` (sideA, sideB each = characterId or NPC name + stat + modifier, reason, mode per side) in Phase 4; both rolls are stored as `dice_rolled` events sharing a `contestId`, with the outcome recorded on the second.
+- In Round mode the GM must use a contest whenever two submitted player actions conflict, instead of picking a winner itself.
+
+### A10. Character sheets: placement and creation rules
+
+**Placement.** Desktop (≥1024 px): a right-hand sidebar with tabs **Character** (your sheet, default), **Party** (everyone's sheets) and **Chat**; the story and dice stay in the main column. Mobile: a fixed bottom tab bar (**Story · Sheet · Dice · Party · Chat**) showing one panel at a time. Same components on both.
+
+**Creation (Phase 3).** One character per player. Quick path: pick a role from the preset (its starting kit becomes inventory), choose a stat method, name and look. Describe-your-own path: the player describes the character; the summary model drafts name, ancestry, class, a stat *priority order* (not numbers), look, a short backstory and one personal item; the player edits; the same validation applies.
+
+Stat methods (all validated on the server):
+- **Standard array** 15, 14, 13, 12, 10, 8.
+- **Point buy** 27 points, scores 8–15, 5e costs (8=0 … 13=5, 14=7, 15=9).
+- **Roll** 4d6 drop lowest, six times, rolled once per player by the server (everyone sees the rolls); the six results must be used exactly.
+
+Derived at level 1: max HP = 10 + CON modifier (min 1); AC = 10 + DEX modifier; 10 currency; level 1, 0 XP. Personal items are flavour only (no mechanical effect). The host can change anything afterwards with host overrides.
+
+**Who can change what.** Players: their own name, notes, look, and equipping/unequipping their own items. Everything else (HP, gold, stats, level, XP, AC, conditions, adding/removing items) is host override or GM tools only.

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ChatPanel } from '../components/ChatPanel.tsx';
 import { CopyButton } from '../components/CopyButton.tsx';
-import { DicePanel } from '../components/DicePanel.tsx';
+import { TableLayout } from '../components/TableLayout.tsx';
 import { api } from '../lib/api.ts';
 import { navigate, setTheme } from '../lib/router.ts';
 import { clearCreds, loadCreds, saveCreds } from '../lib/storage.ts';
@@ -28,7 +27,7 @@ const STATUS_TEXT = {
 } as const;
 
 export function Room({ roomId, hostToken }: { roomId: string; hostToken: string | null }) {
-  const { status, state, settings, inviteCode, isHost, online, connect, disconnect, send } = useRoom();
+  const { status, state, settings, inviteCode, isHost, connect, disconnect, send } = useRoom();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -81,11 +80,10 @@ export function Room({ roomId, hostToken }: { roomId: string; hostToken: string 
   }
 
   const inviteLink = inviteCode ? `${location.origin}/join/${inviteCode}` : '';
-  const activePlayers = state.players.filter((p) => p.active);
   const statusColour = status === 'online' ? 'bg-good' : status === 'reconnecting' ? 'bg-accent-2' : 'bg-muted';
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-4">
+    <div className="mx-auto max-w-6xl px-4 pt-4 pb-24 lg:pb-4">
       <header className="panel mb-4 flex flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3">
         <div className="min-w-[min(100%,16rem)] flex-1">
           <h1 className="heading truncate text-2xl font-bold" data-testid="room-name">
@@ -130,45 +128,7 @@ export function Room({ roomId, hostToken }: { roomId: string; hostToken: string 
         </p>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
-        <div className="flex min-w-0 flex-col gap-4">
-          <section className="panel p-5" aria-labelledby="story-h">
-            <h2 id="story-h" className="heading text-xl">
-              The story
-            </h2>
-            <p className="mt-1 text-muted">{state.setting?.tone}</p>
-            <p className="mt-3 text-sm text-muted">
-              The AI Game Master arrives in a later build. For now, gather your party, chat and test the dice. Possible openings:
-            </p>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
-              {state.setting?.openingHooks.map((h) => <li key={h}>{h}</li>)}
-            </ul>
-          </section>
-
-          <section className="panel p-5" aria-labelledby="party-h">
-            <h2 id="party-h" className="heading text-xl">
-              At the table
-            </h2>
-            <ul className="mt-2 flex flex-wrap gap-2" data-testid="player-list">
-              {activePlayers.map((p) => {
-                const here = online.includes(p.id);
-                return (
-                  <li key={p.id} className="flex items-center gap-2 rounded-full border border-line bg-raised px-3 py-1 text-sm">
-                    <span className={`h-2 w-2 rounded-full ${here ? 'bg-good' : 'bg-muted opacity-50'}`} aria-label={here ? 'online' : 'away'} />
-                    {p.displayName}
-                    {p.isHost && <span className="text-xs text-muted">host</span>}
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        </div>
-
-        <div className="flex min-w-0 flex-col gap-4">
-          <DicePanel />
-          <ChatPanel />
-        </div>
-      </div>
+      <TableLayout />
     </div>
   );
 }

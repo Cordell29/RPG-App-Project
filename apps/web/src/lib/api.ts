@@ -1,4 +1,4 @@
-import type { SettingPreset, Theme } from '@tavern/shared';
+import type { CharacterCreateInput, SettingPreset, Theme } from '@tavern/shared';
 
 export class ApiError extends Error {
   readonly status: number;
@@ -8,10 +8,13 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
+async function request<T>(method: 'GET' | 'POST', path: string, body?: unknown, token?: string): Promise<T> {
+  const headers: Record<string, string> = {};
+  if (body !== undefined) headers['content-type'] = 'application/json';
+  if (token) headers.authorization = `Bearer ${token}`;
   const res = await fetch(path, {
     method,
-    headers: body === undefined ? {} : { 'content-type': 'application/json' },
+    headers,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const data = (await res.json().catch(() => ({}))) as { error?: string };
@@ -44,6 +47,13 @@ export const api = {
   room: (roomId: string) => request<RoomSummary>('GET', `/api/rooms/${encodeURIComponent(roomId)}`),
   join: (roomId: string, displayName: string) =>
     request<Credentials>('POST', `/api/rooms/${encodeURIComponent(roomId)}/join`, { displayName }),
+  draftCharacter: (creds: Credentials, description: string) =>
+    request<CharacterCreateInput>(
+      'POST',
+      `/api/rooms/${encodeURIComponent(creds.roomId)}/character-draft`,
+      { description },
+      creds.token,
+    ),
   claimHost: (roomId: string, hostToken: string) =>
     request<Credentials>('POST', `/api/rooms/${encodeURIComponent(roomId)}/claim-host`, { hostToken }),
 };

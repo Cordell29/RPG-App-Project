@@ -78,9 +78,12 @@ export function randomEvents(count: number, seed: number, opts: { voids?: boolea
       case 2:
         push('character_edited', { characterId: c!.id, patch: { notes: `note ${idCounter++}` } });
         break;
-      case 3:
-        push('chat_message', { playerId: pl.id, text: 'hello' });
+      case 3: {
+        const item = c!.inventory.length ? r.pick(c!.inventory) : undefined;
+        if (item && r.chance(0.5)) push('item_equipped', { characterId: c!.id, instanceId: item.instanceId, equipped: r.chance(0.5) });
+        else push('chat_message', { playerId: pl.id, text: 'hello' });
         break;
+      }
       case 4:
         push('action_submitted', { playerId: pl.id, characterId: pl.characterId, text: 'I search the room' });
         break;

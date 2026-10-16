@@ -3,18 +3,15 @@ import { buildApp } from './app.ts';
 import { loadConfig } from './config.ts';
 import { openDb } from './db/connection.ts';
 import { AnthropicProvider } from './llm/anthropic.ts';
-import { MockLLMProvider } from './llm/mock.ts';
+import { devMockProvider } from './llm/devMock.ts';
 import type { LLMProvider } from './llm/provider.ts';
-import { mockSettingDraft } from './llm/settingDraft.ts';
 
 const config = loadConfig();
 mkdirSync(config.dataDir, { recursive: true });
 // openDb runs migrations and throws on failure, so a bad migration stops startup here.
 const db = openDb(config.dbFile);
 
-const llm: LLMProvider = config.anthropic
-  ? new AnthropicProvider(config.anthropic)
-  : new MockLLMProvider((req) => mockSettingDraft(req.prompt.replace(/<\/?world_description>/g, '')));
+const llm: LLMProvider = config.anthropic ? new AnthropicProvider(config.anthropic) : devMockProvider();
 
 const { app, commands } = await buildApp({ db, llm, webDist: config.webDist, logger: true });
 commands.pruneLog();

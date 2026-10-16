@@ -34,6 +34,7 @@ async function joinAs(browser: Browser, invite: string, name: string, roomName =
 }
 
 async function chat(page: Page, text: string) {
+  await page.getByRole('tab', { name: 'Chat' }).click();
   await page.getByLabel('Message').fill(text);
   await page.getByRole('button', { name: 'Send' }).click();
 }
@@ -47,8 +48,11 @@ test('two players share chat and dice, and a dropped connection catches up exact
   expect(invite).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
 
   const guest = await joinAs(browser, invite, 'Bea');
-  await expect(host.getByTestId('player-list')).toContainText('Bea');
-  await expect(guest.getByTestId('player-list')).toContainText('Cordell');
+  for (const [p, other] of [[host, 'Bea'], [guest, 'Cordell']] as const) {
+    await p.getByRole('tab', { name: 'Party' }).click();
+    await expect(p.getByTestId('party-panel')).toContainText(other);
+    await p.getByRole('tab', { name: 'Chat' }).click();
+  }
 
   // Chat both ways.
   await chat(host, 'Welcome to the Goose!');
@@ -134,7 +138,8 @@ test('describe your own world, play solo, then open the table to friends', async
   await page.getByRole('button', { name: 'Invite friends' }).click();
   const code = (await page.getByTestId('room-invite-code').textContent())!;
   const guest = await joinAs(browser, code.replace('-', '').toLowerCase(), 'Bea', 'Lanternwake');
-  await expect(page.getByTestId('player-list')).toContainText('Bea');
+  await page.getByRole('tab', { name: 'Party' }).click();
+  await expect(page.getByTestId('party-panel')).toContainText('Bea');
   await expect(guest.locator('html')).toHaveAttribute('data-theme', 'neon');
 });
 

@@ -19,6 +19,7 @@ export const EVENT_TYPES = [
   'player_left',
   'character_created',
   'character_edited',
+  'item_equipped',
   'chat_message',
   'action_submitted',
   'turn_started',
@@ -103,6 +104,7 @@ export const PAYLOAD_SCHEMAS = {
       })
       .partial(),
   }),
+  item_equipped: z.object({ characterId: IdSchema, instanceId: IdSchema, equipped: z.boolean() }),
   chat_message: z.object({ playerId: IdSchema, text: z.string().min(1).max(LIMITS.chatLength) }),
   action_submitted: z.object({
     playerId: IdSchema,
@@ -186,6 +188,7 @@ export const GameEventSchema = z.discriminatedUnion('type', [
   eventSchema('player_left'),
   eventSchema('character_created'),
   eventSchema('character_edited'),
+  eventSchema('item_equipped'),
   eventSchema('chat_message'),
   eventSchema('action_submitted'),
   eventSchema('turn_started'),

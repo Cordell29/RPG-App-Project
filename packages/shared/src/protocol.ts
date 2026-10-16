@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { LIMITS } from './constants.ts';
-import type { GameEvent } from './events.ts';
+import { CharacterCreateSchema } from './character.ts';
+import { type GameEvent, HostOverrideSchema } from './events.ts';
 import type { RoomSettings } from './room.ts';
 import type { GameState } from './state.ts';
 
@@ -27,11 +28,40 @@ export const CommandSchema = z.discriminatedUnion('type', [
     reason: z.string().trim().max(200).optional(),
   }),
   z.object({ commandId, type: z.literal('set_room_mode'), mode: z.enum(['solo', 'group']) }),
+  z.object({ commandId, type: z.literal('roll_stats') }),
+  z.object({ commandId, type: z.literal('create_character'), character: CharacterCreateSchema }),
+  z.object({
+    commandId,
+    type: z.literal('edit_character'),
+    characterId: z.string().min(1).max(64),
+    // Players may only change these. strict() rejects anything else (HP, gold, …).
+    patch: z
+      .object({
+        name: z.string().trim().min(1).max(LIMITS.name),
+        notes: z.string().max(LIMITS.characterNotes),
+        visualDescriptor: z.string().max(LIMITS.visualDescriptor),
+      })
+      .partial()
+      .strict(),
+  }),
+  z.object({
+    commandId,
+    type: z.literal('equip_item'),
+    characterId: z.string().min(1).max(64),
+    instanceId: z.string().min(1).max(64),
+    equipped: z.boolean(),
+  }),
+  z.object({
+    commandId,
+    type: z.literal('host_override'),
+    override: HostOverrideSchema,
+    reason: z.string().trim().max(300).optional(),
+  }),
 ]);
 export type Command = z.infer<typeof CommandSchema>;
 
 /** Commands only the host may send. */
-export const HOST_COMMANDS: readonly CommandType[] = ['set_room_mode'];
+export const HOST_COMMANDS: readonly CommandType[] = ['set_room_mode', 'host_override'];
 export type CommandType = Command['type'];
 
 export type CommandResult = { ok: true; seqs: number[] } | { ok: false; error: string };

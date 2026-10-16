@@ -10,3 +10,4 @@ export * from './dice.ts';
 export * from './room.ts';
 export * from './protocol.ts';
 export * from './syncClient.ts';
+export * from './character.ts';

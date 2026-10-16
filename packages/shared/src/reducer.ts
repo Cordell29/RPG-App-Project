@@ -86,6 +86,12 @@ export function apply(state: GameState, event: GameEvent, options: ApplyOptions 
       Object.assign(getChar(event.payload.characterId), event.payload.patch);
       break;
 
+    case 'item_equipped': {
+      const { characterId, instanceId, equipped } = event.payload;
+      findItem(getChar(characterId), instanceId, fail).equipped = equipped;
+      break;
+    }
+
     case 'action_submitted': {
       const { playerId, characterId, text } = event.payload;
       if (!s.players.some((p) => p.id === playerId)) fail(`unknown player ${playerId}`);

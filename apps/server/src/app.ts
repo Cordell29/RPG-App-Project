@@ -7,6 +7,7 @@ import { CommandBus } from './commands.ts';
 import type { Db } from './db/connection.ts';
 import { EventStore } from './db/eventStore.ts';
 import { LLMError, type LLMProvider } from './llm/provider.ts';
+import { draftCharacter } from './llm/characterDraft.ts';
 import { draftSetting } from './llm/settingDraft.ts';
 import { type TavernIo, attachRealtime } from './realtime.ts';
 import { CreateRoomSchema, RoomError, RoomService } from './rooms.ts';
@@ -64,6 +65,15 @@ export async function buildApp(deps: AppDeps): Promise<TavernApp> {
   app.post('/api/rooms/:roomId/join', async (req) => {
     const { displayName } = z.object({ displayName: z.string() }).parse(req.body);
     return rooms.joinRoom((req.params as { roomId: string }).roomId, displayName);
+  });
+
+  /** Describe-your-own character draft. Requires the player's seat token (Authorization: Bearer). */
+  app.post('/api/rooms/:roomId/character-draft', async (req) => {
+    const roomId = (req.params as { roomId: string }).roomId;
+    const token = (req.headers.authorization ?? '').replace(/^Bearer\s+/i, '');
+    if (!token || !rooms.authenticate(roomId, token)) throw new RoomError('Sign in to this room first.', 401);
+    const { description } = z.object({ description: z.string() }).parse(req.body);
+    return draftCharacter(deps.llm, store.getState(roomId).setting, description);
   });
 
   app.post('/api/rooms/:roomId/claim-host', async (req) => {

@@ -97,6 +97,7 @@ export async function draftSetting(llm: LLMProvider, description: string): Promi
     throw new LLMError(`Keep the description under ${LIMITS.customSettingDescription} characters.`);
   }
   const { data } = await llm.structured({
+    purpose: 'setting_draft',
     tier: 'summary',
     system: SETTING_DRAFT_SYSTEM,
     prompt: `<world_description>\n${text.replace(/<\/?world_description>/gi, '')}\n</world_description>`,

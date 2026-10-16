@@ -11,7 +11,11 @@ export interface Usage {
   cacheWriteTokens?: number;
 }
 
+export type LLMPurpose = 'setting_draft' | 'character_draft';
+
 export interface StructuredRequest<T> {
+  /** What the call is for (logging, cost attribution, and mock routing). */
+  purpose: LLMPurpose;
   /** 'summary' = the cheap model (drafts, recaps); 'turn' = the GM model. */
   tier: 'summary' | 'turn';
   system: string;

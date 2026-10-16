@@ -176,6 +176,17 @@ forType('character_edited', () => {
   });
 });
 
+forType('item_equipped', () => {
+  it('toggles equipped on an owned item; unknown items throw', () => {
+    const log = seededLog();
+    withSword(log);
+    log.push('item_equipped', { characterId: 'c1', instanceId: 'i1', equipped: true });
+    expect(char(replay(log.events), 'c1').inventory[0]!.equipped).toBe(true);
+    log.push('item_equipped', { characterId: 'c1', instanceId: 'nope', equipped: true });
+    expect(() => replay(log.events)).toThrow(ReducerError);
+  });
+});
+
 forType('chat_message', () => {
   it('changes nothing but seq', () => {
     const { before, after } = step(seededLog(), (l) =>
