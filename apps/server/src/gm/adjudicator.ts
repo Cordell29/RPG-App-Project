@@ -219,10 +219,10 @@ export class Adjudicator {
   private check(i: Input<'request_check'>): ToolOutcome {
     const c = this.char(i.characterId);
     const stat = i.skill ? SKILLS[i.skill] : i.stat;
-    const mod = checkModifier(c, { stat, skill: i.skill, save: i.save });
+    const mod = i.flat ? 0 : checkModifier(c, { stat, skill: i.skill, save: i.save });
     const r = this.roll(20, 1, mod, i.mode);
     const success = r.total >= i.dc;
-    const what = i.skill ? `${skillLabel(this.state.setting, i.skill)} (${statLabel(this.state.setting, stat)})` : `${statLabel(this.state.setting, stat)}${i.save ? ' save' : ''}`;
+    const what = i.flat ? 'flat d20' : i.skill ? `${skillLabel(this.state.setting, i.skill)} (${statLabel(this.state.setting, stat)})` : `${statLabel(this.state.setting, stat)}${i.save ? ' save' : ''}`;
     const text = `${c.name} ${what} check${i.reason ? ` to ${i.reason}` : ''}: rolled ${this.kept(r)} ${fmt(mod)} = ${r.total} vs DC ${i.dc} → ${success ? 'success' : 'failure'}`;
     this.pushRoll({ ...r, dc: i.dc, success, characterId: c.id, stat, ...(i.reason ? { reason: clip(i.reason) } : {}) }, text);
     return { ok: true, result: text };

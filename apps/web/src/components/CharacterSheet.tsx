@@ -7,6 +7,7 @@ import {
   SKILL_KEYS,
   STAT_KEYS,
   XP_THRESHOLDS,
+  acBreakdown,
   effectiveAc,
   effectiveStats,
   proficiencyBonus,
@@ -146,6 +147,23 @@ export function CharacterSheet({ character: c, setting, canEdit }: { character: 
           </div>
         </div>
       </div>
+
+      <p className="-mt-2 text-center text-xs text-muted" data-testid="ac-breakdown">
+        AC{' '}
+        {(() => {
+          const b = acBreakdown(c);
+          return (
+            <>
+              {b.parts
+                .filter((p, i) => i === 0 || p.value !== 0)
+                .map((p, i) => `${i ? (p.value < 0 ? ' − ' : ' + ') : ''}${Math.abs(p.value)}${i ? ` ${p.label === 'Dex' ? (setting?.statLabels.dex ?? 'Dex') : p.label}` : ''}`)
+                .join('')}{' '}
+              = {b.total}
+              {b.dexCapped ? ` (${setting?.statLabels.dex ?? 'Dex'} capped by armour)` : ''}
+            </>
+          );
+        })()}
+      </p>
 
       <div>
         <div className="flex justify-between text-xs text-muted">

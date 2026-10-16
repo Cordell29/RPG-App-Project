@@ -90,6 +90,8 @@ export const CommandSchema = z.discriminatedUnion('type', [
       uses: z.number().int().min(1).max(20).optional(),
       recharge: z.enum(RECHARGES).default('at_will'),
     }),
+    /** The 5e/Starforged feature or spell it is comparable to (shown to the host). */
+    basis: z.string().trim().max(300).optional(),
   }),
   z.object({
     commandId,

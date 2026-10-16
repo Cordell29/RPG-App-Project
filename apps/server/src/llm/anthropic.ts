@@ -61,11 +61,23 @@ export class AnthropicProvider implements LLMProvider {
 
   private params(req: ChatRequest) {
     const model = req.tier === 'turn' ? this.config.turnModel : this.config.summaryModel;
-    const tools = req.tools?.map((t, i, all) => ({
+    const custom = req.tools?.map((t, i, all) => ({
       ...t,
       // One breakpoint after the (stable) tool list caches tools + nothing volatile.
-      ...(i === all.length - 1 ? { cache_control: { type: 'ephemeral' as const } } : {}),
+      ...(i === all.length - 1 && !req.webSearch ? { cache_control: { type: 'ephemeral' as const } } : {}),
     }));
+    const search = req.webSearch
+      ? [
+          {
+            type: 'web_search_20260209' as const,
+            name: 'web_search' as const,
+            max_uses: req.webSearch.maxUses,
+            allowed_domains: req.webSearch.allowedDomains,
+            cache_control: { type: 'ephemeral' as const },
+          },
+        ]
+      : [];
+    const tools = [...(custom ?? []), ...search];
     return {
       model,
       max_tokens: req.maxTokens ?? 16000,

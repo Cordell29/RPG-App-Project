@@ -56,6 +56,8 @@ export interface ChatRequest {
   messages: LlmMessage[];
   tools?: ToolSpec[];
   maxTokens?: number;
+  /** Allow Anthropic's server-side web search, limited to these domains. */
+  webSearch?: { allowedDomains: string[]; maxUses: number };
   /** Lower effort for fast, simple calls (narration). */
   effort?: 'low' | 'medium' | 'high';
   signal?: AbortSignal;
@@ -78,6 +80,9 @@ export interface LLMProvider {
   /** Streams text deltas to onText; resolves with the full response. */
   streamText(req: ChatRequest, onText: (delta: string) => void): Promise<ChatResponse>;
 }
+
+/** Openly licensed rules sources the GM may consult (5e SRD, Ironsworn/Starforged). */
+export const RULES_DOMAINS = ['open5e.com', '5thsrd.org', 'dndbeyond.com', 'roll20.net', 'ironswornrpg.com'];
 
 export class LLMError extends Error {
   override name = 'LLMError';

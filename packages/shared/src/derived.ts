@@ -27,6 +27,25 @@ export function effectiveAc(c: Character): number {
   return body + equipped(c).reduce((n, i) => n + (i.effects!.acBonus ?? 0), 0);
 }
 
+/** The same total as effectiveAc, itemised: base + Dex (capped) + armour over 10 + bonuses. */
+export function acBreakdown(c: Character): { total: number; parts: { label: string; value: number }[]; dexCapped: boolean } {
+  const dex = effMod(c, 'dex');
+  const armour = equipped(c)
+    .filter((i) => i.slot === 'armor' && i.effects!.acBase)
+    .sort((a, b) => b.effects!.acBase! - a.effects!.acBase!)[0];
+  const cap = armour?.effects!.dexCap ?? Infinity;
+  const dexPart = Math.min(dex, cap);
+  const parts = [
+    { label: 'Base', value: armour ? 10 : c.ac },
+    { label: 'Dex', value: dexPart },
+    ...(armour ? [{ label: armour.name, value: armour.effects!.acBase! - 10 }] : []),
+    ...equipped(c)
+      .filter((i) => i.effects!.acBonus)
+      .map((i) => ({ label: i.name, value: i.effects!.acBonus! })),
+  ];
+  return { total: parts.reduce((n, p) => n + p.value, 0), parts, dexCapped: dexPart < dex };
+}
+
 export function skillModifier(c: Character, skill: SkillKey): number {
   const prof = c.proficiencies.skills.includes(skill) ? proficiencyBonus(c.level) : 0;
   const items = equipped(c).reduce((n, i) => n + (i.effects!.skillBonus?.[skill] ?? 0), 0);

@@ -16,6 +16,7 @@ export function ApprovalQueue() {
             <div className="min-w-0 flex-1">
               <strong>{what}</strong> for {who}
               <span className="text-muted"> · {a.requestedBy === 'gm' ? 'offered by the GM' : 'workshopped by the player'}</span>
+              {a.reason && <p className="text-xs italic">{a.reason}</p>}
               {detail && <p className="text-xs text-muted">{detail}</p>}
             </div>
             <button type="button" className="btn btn-primary px-2 py-0.5 text-xs" onClick={() => send({ type: 'resolve_approval', approvalId: a.id, approved: true })}>

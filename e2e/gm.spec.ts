@@ -97,11 +97,14 @@ test('the sheet shows 5e details, and players workshop abilities for host approv
   await gsheet.getByRole('button', { name: 'Draft with AI' }).click();
   await expect(gsheet.getByLabel('Ability name')).toHaveValue('Workshopped Ability');
   await gsheet.getByLabel('Ability name').fill('Rallying Cry');
+  await expect(gsheet.getByLabel('Comparable to')).toHaveValue(/Offline draft/);
+  await gsheet.getByLabel('Comparable to').fill('Like Bardic Inspiration');
   await gsheet.getByRole('button', { name: 'Send to host' }).click();
   await expect(gsheet.getByText('Sent to the host for approval.')).toBeVisible();
 
   const queue = host.getByTestId('approval-queue');
   await expect(queue).toContainText('Rallying Cry for Bram');
+  await expect(queue).toContainText('Like Bardic Inspiration');
   await queue.getByRole('button', { name: 'Approve' }).click();
   await expect(gsheet.getByTestId('abilities')).toContainText('Rallying Cry');
 });

@@ -20,6 +20,7 @@ export interface AppDeps {
   /** Dice source for GM rolls (tests pass a scripted one). */
   random?: (min: number, max: number) => number;
   gmTimeoutMs?: number;
+  rulesLookup?: boolean;
   webDist?: string | null;
   logger?: boolean;
 }
@@ -89,7 +90,7 @@ export async function buildApp(deps: AppDeps): Promise<TavernApp> {
     if (!token || !rooms.authenticate(roomId, token)) throw new RoomError('Sign in to this room first.', 401);
     const { description, characterId } = z.object({ description: z.string(), characterId: z.string() }).parse(req.body);
     const state = store.getState(roomId);
-    return draftAbility(deps.llm, state.setting, state.party.find((c) => c.id === characterId) ?? null, description);
+    return draftAbility(deps.llm, state.setting, state.party.find((c) => c.id === characterId) ?? null, description, deps.rulesLookup ?? true);
   });
 
   app.post('/api/rooms/:roomId/claim-host', async (req) => {
@@ -119,6 +120,7 @@ export async function buildApp(deps: AppDeps): Promise<TavernApp> {
     emit: (roomId, name, payload) => io?.to(roomId).emit(name, payload as never),
     ...(deps.random ? { random: deps.random } : {}),
     ...(deps.gmTimeoutMs ? { timeoutMs: deps.gmTimeoutMs } : {}),
+    rulesLookup: deps.rulesLookup ?? true,
   });
   commands.turns = turns;
   io = attachRealtime(app.server, { rooms, store, commands, turnStatus: (roomId) => turns.status(roomId) });

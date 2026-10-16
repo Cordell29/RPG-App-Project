@@ -80,6 +80,12 @@ describe('Adjudicator: checks and contests (server rolls)', () => {
     expect(rolls(a).map((r) => r!.total)).toEqual([10 + 1 + 2, 10 + 1]);
   });
 
+  it('flat checks (death saves) roll a bare d20', () => {
+    const a = adj(table(), dice(9));
+    a.handle('request_check', { characterId: 'c1', stat: 'con', flat: true, dc: 10, reason: 'death save' });
+    expect(rolls(a)[0]).toMatchObject({ notation: '1d20', total: 9, success: false });
+  });
+
   it('rejects checks for unknown characters and silly DCs', () => {
     const a = adj();
     expect(a.handle('request_check', { characterId: 'ghost', stat: 'dex', dc: 10 }).ok).toBe(false);

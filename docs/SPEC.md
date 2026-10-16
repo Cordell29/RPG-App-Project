@@ -546,3 +546,11 @@ Sci-fi skills are renamed where the fantasy name does not fit (e.g. Arcana → P
 - Round mode: actions are visible to the table and editable/withdrawable until the round resolves (`action_edited`, `action_withdrawn`). Spotlight mode: `spotlight_set` names the player who may act; it passes in seat order after each narration.
 - Sessions: host Start/End session (`session_started`, `session_ended`); the Story view groups narration by session.
 - Read aloud: browser speech in Phase 4 (per-player toggle, voice choice, ▶ on each narration).
+
+### A13. 5e is the rulebook; power scale; rules lookup (host feedback 2026-10-16)
+
+- **The GM defers to D&D 5e (SRD 5.2) for every rule**: actions, bonus actions, reactions, conditions, cover, concentration, death saves, resting, spell levels and item rarity. Sci-fi is a reskin of the same rules (a blaster uses crossbow/bow statistics, a medkit a healer's kit) with narrative tools borrowed from Starforged: vows as quests, failures that cost something (harm, Spirit, Supply or a complication), perilous travel and discovery.
+- **Power scale.** Abilities, spells, gadgets and loot must match what a 5e character of that level could have: spell level by caster level, damage benchmarks, item rarity by tier. A compact reference is part of the GM's cached system prompt; the ability workshop drafts against it and states the 5e feature or spell it is comparable to, which the host sees when approving.
+- **Rules lookup.** When unsure of exact rules text or power level, the GM and the ability workshop may use Anthropic's web search, restricted to openly licensed rules sources (SRD sites, Ironsworn/Starforged). Both the 5e SRD and Starforged are published under Creative Commons licences. Search is capped (2 per GM request) and can be turned off with `GM_RULES_LOOKUP=off`. The app itself does not store rulebooks.
+- **AC display.** The engine keeps the 5e rule (armour sets the base; Dex is capped by medium and heavy armour). The sheet shows it as an itemised sum: 10 + Dex (capped) + armour's bonus over 10 + shield + magic.
+- **Death saves.** `request_check` takes `flat: true` for a d20 with no modifier (death saves, pure luck).

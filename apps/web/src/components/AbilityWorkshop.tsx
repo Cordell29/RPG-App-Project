@@ -13,7 +13,7 @@ export function AbilityWorkshop({ character, onDone }: { character: Character; o
   const { send, creds, isHost } = useRoom();
   const [idea, setIdea] = useState('');
   const [drafting, setDrafting] = useState(false);
-  const [form, setForm] = useState({ name: '', description: '', uses: 0, recharge: 'at_will' as Recharge });
+  const [form, setForm] = useState({ name: '', description: '', uses: 0, recharge: 'at_will' as Recharge, basis: '' });
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   async function draft() {
@@ -22,7 +22,7 @@ export function AbilityWorkshop({ character, onDone }: { character: Character; o
     setMsg(null);
     try {
       const d = await api.draftAbility(creds, character.id, idea);
-      setForm({ name: d.name, description: d.description, uses: d.uses ?? 0, recharge: d.recharge });
+      setForm({ name: d.name, description: d.description, uses: d.uses ?? 0, recharge: d.recharge, basis: d.basis });
     } catch (e) {
       setMsg({ ok: false, text: (e as Error).message });
     } finally {
@@ -40,10 +40,11 @@ export function AbilityWorkshop({ character, onDone }: { character: Character; o
         recharge: form.uses > 0 ? (form.recharge === 'at_will' ? 'long_rest' : form.recharge) : 'at_will',
         ...(form.uses > 0 ? { uses: form.uses } : {}),
       },
+      ...(form.basis.trim() ? { basis: form.basis.trim() } : {}),
     });
     if (!res.ok) return setMsg({ ok: false, text: res.error });
     setMsg({ ok: true, text: isHost ? 'Added.' : 'Sent to the host for approval.' });
-    setForm({ name: '', description: '', uses: 0, recharge: 'at_will' });
+    setForm({ name: '', description: '', uses: 0, recharge: 'at_will', basis: '' });
     setIdea('');
     setTimeout(onDone, 1200);
   }
@@ -58,7 +59,7 @@ export function AbilityWorkshop({ character, onDone }: { character: Character; o
         className="field"
         rows={3}
         maxLength={2000}
-        placeholder="e.g. 'I can call lightning from the sky once a day' or paste a 5e feature or spell"
+        placeholder="e.g. 'I can call lightning from the sky once a day' or paste a 5e feature or spell. The AI scales it to your level."
         value={idea}
         onChange={(e) => setIdea(e.target.value)}
       />
@@ -96,6 +97,10 @@ export function AbilityWorkshop({ character, onDone }: { character: Character; o
             </select>
           </label>
         </div>
+        <label className="block text-xs">
+          <span className="text-muted">Comparable 5e feature or spell (helps the host judge power)</span>
+          <input aria-label="Comparable to" className="field py-1" maxLength={300} placeholder="e.g. Equivalent to Shield (1st-level spell)" value={form.basis} onChange={(e) => setForm({ ...form, basis: e.target.value })} />
+        </label>
         <button type="submit" className="btn btn-primary w-full" disabled={!form.name.trim() || !form.description.trim()}>
           {isHost ? 'Add ability' : 'Send to host'}
         </button>

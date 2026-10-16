@@ -299,7 +299,7 @@ export class CommandBus {
           {
             ...base,
             type: 'approval_requested',
-            payload: { approval: { id: newId(), kind: 'ability', characterId: c.id, ability, reason: 'Workshopped by the player', requestedBy: 'player' } },
+            payload: { approval: { id: newId(), kind: 'ability', characterId: c.id, ability, reason: cmd.basis || 'Workshopped by the player', requestedBy: 'player' } },
           },
         ];
       }

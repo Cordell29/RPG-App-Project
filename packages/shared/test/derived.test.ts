@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   type Character,
   type Item,
+  acBreakdown,
   effectiveAc,
   effectiveStats,
   itemPower,
@@ -49,6 +50,37 @@ describe('effective AC', () => {
   it('unequipped items do nothing', () => {
     const c = base({ inventory: [item({ equipped: false, slot: 'armor', effects: { acBase: 18, dexCap: 0 } })] });
     expect(effectiveAc(c)).toBe(12);
+  });
+});
+
+describe('AC breakdown', () => {
+  it('itemises to the same total as effective AC', () => {
+    const cases = [
+      base(),
+      base({ inventory: [item({ name: 'Leather', slot: 'armor', effects: { acBase: 11, dexCap: null } })] }),
+      base({
+        stats: { str: 10, dex: 18, con: 10, int: 10, wis: 10, cha: 10 },
+        inventory: [item({ name: 'Chain shirt', slot: 'armor', effects: { acBase: 13, dexCap: 2 } }), item({ instanceId: 's', name: 'Shield', slot: 'shield', effects: { acBonus: 2 } })],
+      }),
+      base({ inventory: [item({ name: 'Plate', slot: 'armor', effects: { acBase: 18, dexCap: 0 } })] }),
+    ];
+    for (const c of cases) expect(acBreakdown(c).total).toBe(effectiveAc(c));
+  });
+  it('reads as 10 + Dex + armour over 10 + shield, noting a Dex cap', () => {
+    const c = base({
+      stats: { str: 10, dex: 18, con: 10, int: 10, wis: 10, cha: 10 },
+      inventory: [item({ name: 'Chain shirt', slot: 'armor', effects: { acBase: 13, dexCap: 2 } }), item({ instanceId: 's', name: 'Shield', slot: 'shield', effects: { acBonus: 2 } })],
+    });
+    expect(acBreakdown(c)).toEqual({
+      total: 17,
+      dexCapped: true,
+      parts: [
+        { label: 'Base', value: 10 },
+        { label: 'Dex', value: 2 },
+        { label: 'Chain shirt', value: 3 },
+        { label: 'Shield', value: 2 },
+      ],
+    });
   });
 });
 

@@ -100,6 +100,20 @@ describe('GM turns', () => {
     expect(JSON.stringify(n)).not.toMatch(/10000|10,000/);
   });
 
+  it('the GM may look up rules (server-side web search) and a paused turn resumes', async () => {
+    const { host, ayla } = await table('solo');
+    s.llm.respond({ text: '', stopReason: 'pause_turn' });
+    s.llm.respond({ tools: [{ name: 'change_gold', input: { characterId: ayla.id, amount: 3 } }, { name: 'end_adjudication', input: { summary: 'ok' } }] });
+    s.llm.respond('Done.');
+    await host.send({ type: 'submit_action', text: 'I cast Fireball at the goblins.' });
+    await host.until(() => host.log.events.some((e) => e.type === 'narration'));
+    const calls = gmCalls() as { webSearch?: { maxUses: number; allowedDomains: string[] } }[];
+    expect(calls).toHaveLength(2);
+    expect(calls[0]!.webSearch).toMatchObject({ maxUses: 2, allowedDomains: expect.arrayContaining(['ironswornrpg.com']) });
+    expect(host.state.party[0]!.gold).toBe(13);
+    expect((narrateCalls()[0] as { webSearch?: unknown }).webSearch).toBeUndefined();
+  });
+
   it('two players acting at once produce exactly one GM call', async () => {
     const { room, host, guest } = await table();
     s.llm.delayMs = 50;
@@ -276,8 +290,9 @@ describe('GM turns', () => {
   it('workshopped abilities: players propose, the host approves; the host adds directly', async () => {
     const { host, guest, ayla, bram } = await table();
     const ability = { name: 'Shield Bash', description: 'Bonus action: shove with your shield (Athletics contest).', uses: 2, recharge: 'short_rest' as const };
-    expect(await guest.send({ type: 'propose_ability', characterId: bram.id, ability })).toMatchObject({ ok: true });
+    expect(await guest.send({ type: 'propose_ability', characterId: bram.id, ability, basis: 'Like the Shield Master feat' })).toMatchObject({ ok: true });
     await host.until(() => host.state.pendingApprovals.length === 1);
+    expect(host.state.pendingApprovals[0]!.reason).toBe('Like the Shield Master feat');
     await host.send({ type: 'resolve_approval', approvalId: host.state.pendingApprovals[0]!.id, approved: true });
     await guest.until(() => guest.state.party.find((c) => c.id === bram.id)!.abilities.some((a) => a.name === 'Shield Bash'));
     expect(await host.send({ type: 'propose_ability', characterId: ayla.id, ability })).toMatchObject({ ok: true });
@@ -294,6 +309,12 @@ describe('GM turns', () => {
     );
     expect(res.status).toBe(200);
     expect(res.body.description).toMatch(/lightning/);
+    expect(res.body).toMatchObject({ basis: expect.any(String) });
+    const call = s.llm.calls.at(-1) as { purpose: string; tier: string; tools: { name: string }[]; webSearch?: unknown; system: { text: string }[] };
+    expect(call).toMatchObject({ purpose: 'ability_draft', tier: 'turn' });
+    expect(call.tools.map((t) => t.name)).toEqual(['submit_ability']);
+    expect(call.webSearch).toBeTruthy();
+    expect(call.system[0]!.text).toMatch(/level 1 Fighter/);
     expect((await s.post(`/api/rooms/${room.roomId}/ability-draft`, { description: 'x y z', characterId: ayla.id })).status).toBe(401);
   });
 

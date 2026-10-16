@@ -66,6 +66,18 @@ describe('buildTurnPrompt', () => {
     expect(c.abilities[0]).toMatchObject({ name: 'Second Wind', uses: '1/1' });
   });
 
+  it('defers to 5e and carries a power-scale reference; sci-fi is a Starforged-flavoured reskin', () => {
+    const p = buildTurnPrompt({ state: state(scifi), recent: [], actions });
+    const rules = p.system[0]!.text;
+    expect(rules).toMatch(/D&D 5e/);
+    expect(rules).toMatch(/Highest spell level a full caster can cast/);
+    expect(rules).toMatch(/rarity/i);
+    expect(rules).toMatch(/web_search/);
+    expect(p.system[1]!.text).toMatch(/reskin/i);
+    expect(p.system[1]!.text).toMatch(/Starforged/);
+    expect(buildTurnPrompt({ state: state(), recent: [], actions }).system[1]!.text).not.toMatch(/Starforged/);
+  });
+
   it('uses setting names: sci-fi stats, skills, meters and tech charges', () => {
     const p = buildTurnPrompt({ state: state(scifi), recent: [], actions });
     expect(p.system[1]!.text).toMatch(/Iron \(str\).*Edge \(dex\).*Grit \(con\).*Wits \(int\).*Shadow \(wis\).*Heart \(cha\)/s);

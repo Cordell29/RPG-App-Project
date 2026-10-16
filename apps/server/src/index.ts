@@ -13,7 +13,7 @@ const db = openDb(config.dbFile);
 
 const llm: LLMProvider = config.anthropic ? new AnthropicProvider(config.anthropic) : devMockProvider();
 
-const { app, commands } = await buildApp({ db, llm, webDist: config.webDist, logger: true });
+const { app, commands } = await buildApp({ db, llm, webDist: config.webDist, logger: true, rulesLookup: config.rulesLookup });
 commands.pruneLog();
 setInterval(() => commands.pruneLog(), 60 * 60 * 1000).unref();
 

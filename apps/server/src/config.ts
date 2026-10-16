@@ -6,6 +6,7 @@ export interface Config {
   dataDir: string;
   dbFile: string;
   webDist: string | null;
+  rulesLookup: boolean;
   anthropic: { apiKey: string; turnModel: string; summaryModel: string } | null;
 }
 
@@ -19,6 +20,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     dataDir,
     dbFile: env.DB_FILE ?? join(dataDir, 'tavern.db'),
     webDist: env.WEB_DIST ?? new URL('../../web/dist/', import.meta.url).pathname,
+    rulesLookup: (env.GM_RULES_LOOKUP ?? 'on').toLowerCase() !== 'off',
     anthropic: apiKey
       ? {
           apiKey,

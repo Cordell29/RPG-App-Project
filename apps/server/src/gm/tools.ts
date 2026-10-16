@@ -42,6 +42,8 @@ export const TOOL_INPUTS = {
     stat: z.enum(STAT_KEYS),
     skill: z.enum(SKILL_KEYS).optional(),
     save: z.boolean().optional(),
+    /** A bare d20 with no modifier (death saves, pure luck). */
+    flat: z.boolean().optional(),
     dc: z.number().int().min(5).max(30),
     mode,
     reason,
@@ -108,7 +110,7 @@ export const TOOL_NAMES = Object.keys(TOOL_INPUTS) as ToolName[];
 
 const DESCRIPTIONS: Record<ToolName, string> = {
   request_check:
-    'Ask for an ability check or saving throw whenever the outcome is uncertain. Give the skill if one applies (its stat is used), or save:true for a saving throw. The server rolls and returns the result.',
+    'Ask for an ability check or saving throw whenever the outcome is uncertain. Give the skill if one applies (its stat is used), save:true for a saving throw, or flat:true for a bare d20 (death saves: DC 10, three successes or failures). The server rolls and returns the result.',
   request_contest:
     'Resolve two opposed efforts (5e contest), e.g. two players grabbing the same object, a shove vs a brace, sneaking vs noticing. Each side is a character (characterId) or an NPC (npcName + modifier). Higher total wins; a tie keeps the status quo. Use this whenever two player actions conflict.',
   request_attack:

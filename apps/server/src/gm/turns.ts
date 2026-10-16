@@ -12,7 +12,7 @@ import { newId as defaultNewId } from '../auth.ts';
 import type { Db } from '../db/connection.ts';
 import type { EventStore } from '../db/eventStore.ts';
 import { turns } from '../db/schema.ts';
-import type { LLMProvider, LlmMessage, Usage } from '../llm/provider.ts';
+import { type LLMProvider, type LlmMessage, RULES_DOMAINS, type Usage } from '../llm/provider.ts';
 import type { RoomService } from '../rooms.ts';
 import { Adjudicator } from './adjudicator.ts';
 import {
@@ -41,6 +41,8 @@ export interface TurnRunnerDeps {
   random?: RandomInt;
   newId?: () => string;
   timeoutMs?: number;
+  /** Let the GM consult rules sources with web search (on by default). */
+  rulesLookup?: boolean;
 }
 
 /**
@@ -52,7 +54,12 @@ export interface TurnRunnerDeps {
  * commit leaves nothing behind; actions stay queued and the host can retry.
  */
 export class TurnRunner {
-  private readonly d: Required<Omit<TurnRunnerDeps, 'random' | 'newId' | 'timeoutMs'>> & { random: RandomInt; newId: () => string; timeoutMs: number };
+  private readonly d: Required<Omit<TurnRunnerDeps, 'random' | 'newId' | 'timeoutMs' | 'rulesLookup'>> & {
+    random: RandomInt;
+    newId: () => string;
+    timeoutMs: number;
+    rulesLookup: boolean;
+  };
   private readonly chains = new Map<string, Promise<void>>();
   private readonly timers = new Map<string, NodeJS.Timeout>();
   private readonly statuses = new Map<string, TurnStatus>();
@@ -62,7 +69,7 @@ export class TurnRunner {
   readonly gmTurns = new Map<string, number>();
 
   constructor(deps: TurnRunnerDeps) {
-    this.d = { random: randomInt, newId: defaultNewId, timeoutMs: 60_000, ...deps };
+    this.d = { random: randomInt, newId: defaultNewId, timeoutMs: 60_000, rulesLookup: true, ...deps };
   }
 
   status(roomId: string): TurnStatus {
@@ -221,11 +228,23 @@ export class TurnRunner {
       const messages: LlmMessage[] = [{ role: 'user', content: prompt.user }];
       for (let round = 0; round < MAX_ADJUDICATION_ROUNDS && !adj.done; round++) {
         const resp = await this.withTimeout((signal) =>
-          this.d.llm.chat({ purpose: 'gm_adjudicate', tier: 'turn', system: prompt.system, messages, tools, signal }),
+          this.d.llm.chat({
+            purpose: 'gm_adjudicate',
+            tier: 'turn',
+            system: prompt.system,
+            messages,
+            tools,
+            signal,
+            ...(this.d.rulesLookup ? { webSearch: { allowedDomains: RULES_DOMAINS, maxUses: 2 } } : {}),
+          }),
         );
         addUsage(usage, resp.usage);
         messages.push({ role: 'assistant', content: resp.content });
-        if (resp.toolUses.length === 0) break;
+        if (resp.toolUses.length === 0) {
+          // A long server-side search can pause; re-sending the conversation resumes it.
+          if (resp.stopReason === 'pause_turn') continue;
+          break;
+        }
         const results = resp.toolUses.map((t) => {
           const out = adj.handle(t.name, t.input);
           return { type: 'tool_result', tool_use_id: t.id, content: out.result, ...(out.ok ? {} : { is_error: true }) };

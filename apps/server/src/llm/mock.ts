@@ -53,13 +53,13 @@ export class MockLLMProvider implements LLMProvider {
   }
 
   async chat(req: ChatRequest): Promise<ChatResponse> {
-    const reply = (await this.next(req)) as { tools?: { name: string; input: unknown }[]; text?: string };
+    const reply = (await this.next(req)) as { tools?: { name: string; input: unknown }[]; text?: string; stopReason?: string };
     const toolUses: ToolUse[] = (reply.tools ?? []).map((t, i) => ({ id: `tu_${this.calls.length}_${i}`, name: t.name, input: t.input }));
     const content: LlmBlock[] = [
       ...(reply.text ? [{ type: 'text', text: reply.text }] : []),
       ...toolUses.map((t) => ({ type: 'tool_use', id: t.id, name: t.name, input: t.input })),
     ];
-    return { content, text: reply.text ?? '', toolUses, stopReason: toolUses.length ? 'tool_use' : 'end_turn', usage: USAGE };
+    return { content, text: reply.text ?? '', toolUses, stopReason: reply.stopReason ?? (toolUses.length ? 'tool_use' : 'end_turn'), usage: USAGE };
   }
 
   async streamText(req: ChatRequest, onText: (delta: string) => void): Promise<ChatResponse> {

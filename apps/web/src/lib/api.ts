@@ -55,7 +55,7 @@ export const api = {
       creds.token,
     ),
   draftAbility: (creds: Credentials, characterId: string, description: string) =>
-    request<{ name: string; description: string; uses?: number; recharge: 'at_will' | 'short_rest' | 'long_rest' }>(
+    request<{ name: string; description: string; uses?: number; recharge: 'at_will' | 'short_rest' | 'long_rest'; basis: string }>(
       'POST',
       `/api/rooms/${encodeURIComponent(creds.roomId)}/ability-draft`,
       { description, characterId },

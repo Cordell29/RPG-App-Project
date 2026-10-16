@@ -49,8 +49,18 @@ export function devMockProvider(): MockLLMProvider {
         return mockSettingDraft(strip((req as { prompt: string }).prompt));
       case 'character_draft':
         return mockCharacterDraft(strip((req as { prompt: string }).prompt));
-      case 'ability_draft':
-        return { name: 'Workshopped Ability', description: strip((req as { prompt: string }).prompt).trim().slice(0, 300), uses: 1, recharge: 'long_rest' };
+      case 'ability_draft': {
+        const msgs = (req as ChatRequest).messages;
+        const idea = strip(String(msgs[0]?.content ?? '')).trim();
+        return {
+          tools: [
+            {
+              name: 'submit_ability',
+              input: { name: 'Workshopped Ability', description: idea.slice(0, 300), uses: 1, recharge: 'long_rest', basis: 'Offline draft: no rules comparison (add an API key)' },
+            },
+          ],
+        };
+      }
       case 'gm_adjudicate':
       case 'gm_narrate':
         return devGm(req as ChatRequest);

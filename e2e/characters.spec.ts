@@ -16,6 +16,7 @@ test('characters live in the sidebar; host overrides reach players within a seco
   const sheet = guest.getByTestId('character-sheet');
   await expect(sheet.getByTestId('sheet-hp')).toHaveText('12/12'); // 10 + CON 14 (+2)
   await expect(sheet.getByTestId('sheet-ac')).toHaveText('13'); // leather armour 11 + DEX 15 (+2)
+  await expect(sheet.getByTestId('ac-breakdown')).toHaveText('AC 10 + 2 Dexterity + 1 Leather armor = 13');
   await expect(sheet.getByTestId('sheet-gold')).toHaveText('10');
   await expect(sheet.getByTestId('inventory')).toContainText("Thieves' tools");
   await expect(sheet.getByTestId('stat-dex')).toContainText('+2');
