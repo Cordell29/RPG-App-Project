@@ -52,6 +52,10 @@ export function makeCharacter(over: Partial<Character> & { id: string; playerId:
     conditions: [],
     visualDescriptor: 'tall woman, braided red hair, scarred leather armour',
     notes: '',
+    proficiencies: { skills: [], saves: [] },
+    abilities: [],
+    spellSlots: [],
+    meters: {},
     ...over,
   };
 }

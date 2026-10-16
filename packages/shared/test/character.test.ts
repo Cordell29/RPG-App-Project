@@ -6,7 +6,9 @@ import {
   STAT_ROLL_NOTATION,
   assignByPriority,
   buildCharacter,
+  checkProficiencies,
   checkStats,
+  effectiveAc,
   getPreset,
   pointBuyCost,
   rollContest,
@@ -93,20 +95,71 @@ describe('buildCharacter', () => {
       notes: 'Owes the Thieves Guild a favour.',
       personalItem: { name: "Mother's locket", notes: 'Holds a faded portrait.' },
     });
-    const c = buildCharacter(input, { ...ids, preset: fantasy });
+    const c = buildCharacter({ ...input, skills: ['athletics', 'perception'] }, { ...ids, preset: fantasy });
     expect(CharacterSchema.parse(c)).toEqual(c);
     expect(c).toMatchObject({
       level: 1,
       xp: 0,
       hp: { current: 12, max: 12 }, // 10 + CON 14 (+2)
-      ac: 11, // 10 + DEX 13 (+1)
+      ac: 10, // base; armour applies on top
       gold: 10,
       class: 'Fighter',
       conditions: [],
+      proficiencies: { skills: ['athletics', 'perception'], saves: ['str', 'con'] },
+      spellSlots: [],
+      meters: {},
     });
+    // Chain shirt 13 + DEX +1 (cap 2) + shield 2, all auto-equipped.
+    expect(effectiveAc(c)).toBe(16);
+    expect(c.inventory.find((i) => i.name === 'Longsword')).toMatchObject({ equipped: true, slot: 'weapon', effects: { damage: '1d8' } });
+    expect(c.abilities.map((a) => a.name)).toEqual(['Second Wind', 'Fighting Style: Defence']);
+    expect(c.abilities[0]!.uses).toEqual({ current: 1, max: 1 });
     expect(c.inventory.map((i) => i.name)).toEqual(['Longsword', 'Shield', 'Chain shirt', 'Rations (3 days)', "Mother's locket"]);
     expect(c.inventory.at(-1)).toMatchObject({ tags: ['personal'], notes: 'Holds a faded portrait.' });
     expect(new Set(c.inventory.map((i) => i.instanceId)).size).toBe(c.inventory.length);
+  });
+
+  it('casters get spell slots; sci-fi characters get Spirit and Supply', () => {
+    const wiz = buildCharacter(
+      CharacterCreateSchema.parse({
+        name: 'Ilse',
+        ancestry: 'Elf',
+        className: 'Wizard',
+        roleName: 'Wizard',
+        statMethod: 'standard',
+        stats: { str: 8, dex: 14, con: 13, int: 15, wis: 12, cha: 10 },
+        skills: ['arcana', 'history'],
+      }),
+      { ...ids, preset: fantasy },
+    );
+    expect(wiz.spellSlots).toEqual([{ current: 2, max: 2 }]);
+    const scifi = getPreset('scifi')!;
+    const pilot = buildCharacter(
+      CharacterCreateSchema.parse({
+        name: 'Vex',
+        ancestry: '',
+        className: 'Pilot',
+        roleName: 'Pilot',
+        statMethod: 'standard',
+        stats: { str: 8, dex: 15, con: 13, int: 12, wis: 14, cha: 10 },
+        skills: ['acrobatics', 'perception'],
+      }),
+      { ...ids, preset: scifi },
+    );
+    expect(pilot.meters).toEqual({ spirit: { current: 5, max: 5 }, supply: { current: 5, max: 5 } });
+    expect(effectiveAc(pilot)).toBe(13); // flight jacket 11 + Edge +2
+  });
+
+  it('proficiency choices follow the role, or any 2 + 2 for custom classes', () => {
+    const rogue = fantasy.roles.find((r) => r.name === 'Rogue')!;
+    expect(checkProficiencies(rogue, ['stealth', 'deception', 'acrobatics', 'insight'], [])).toBeNull();
+    expect(checkProficiencies(rogue, ['stealth', 'deception'], [])).toMatch(/Pick 4 skills/);
+    expect(checkProficiencies(rogue, ['stealth', 'deception', 'acrobatics', 'arcana'], [])).toMatch(/not available/);
+    expect(checkProficiencies(rogue, ['stealth', 'stealth', 'acrobatics', 'insight'], [])).toMatch(/different skills/);
+    expect(checkProficiencies(undefined, ['arcana', 'stealth'], ['int', 'dex'])).toBeNull();
+    expect(checkProficiencies(undefined, ['arcana', 'stealth'], ['int'])).toMatch(/saving throws/);
+    const bard = fantasy.roles.find((r) => r.name === 'Bard')!;
+    expect(checkProficiencies(bard, ['arcana', 'stealth', 'medicine'], [])).toBeNull(); // bards pick any 3
   });
 
   it('ignores a client-sent kit when a preset role is chosen', () => {

@@ -9,12 +9,17 @@ import { EventStore } from './db/eventStore.ts';
 import { LLMError, type LLMProvider } from './llm/provider.ts';
 import { draftCharacter } from './llm/characterDraft.ts';
 import { draftSetting } from './llm/settingDraft.ts';
+import { TurnRunner } from './gm/turns.ts';
+import { draftAbility } from './llm/abilityDraft.ts';
 import { type TavernIo, attachRealtime } from './realtime.ts';
 import { CreateRoomSchema, RoomError, RoomService } from './rooms.ts';
 
 export interface AppDeps {
   db: Db;
   llm: LLMProvider;
+  /** Dice source for GM rolls (tests pass a scripted one). */
+  random?: (min: number, max: number) => number;
+  gmTimeoutMs?: number;
   webDist?: string | null;
   logger?: boolean;
 }
@@ -25,6 +30,7 @@ export interface TavernApp {
   store: EventStore;
   rooms: RoomService;
   commands: CommandBus;
+  turns: TurnRunner;
 }
 
 export async function buildApp(deps: AppDeps): Promise<TavernApp> {
@@ -76,6 +82,16 @@ export async function buildApp(deps: AppDeps): Promise<TavernApp> {
     return draftCharacter(deps.llm, store.getState(roomId).setting, description);
   });
 
+  /** Workshop an ability with the AI: returns a draft the player edits, then proposes. */
+  app.post('/api/rooms/:roomId/ability-draft', async (req) => {
+    const roomId = (req.params as { roomId: string }).roomId;
+    const token = (req.headers.authorization ?? '').replace(/^Bearer\s+/i, '');
+    if (!token || !rooms.authenticate(roomId, token)) throw new RoomError('Sign in to this room first.', 401);
+    const { description, characterId } = z.object({ description: z.string(), characterId: z.string() }).parse(req.body);
+    const state = store.getState(roomId);
+    return draftAbility(deps.llm, state.setting, state.party.find((c) => c.id === characterId) ?? null, description);
+  });
+
   app.post('/api/rooms/:roomId/claim-host', async (req) => {
     const { hostToken } = z.object({ hostToken: z.string().min(16).max(128) }).parse(req.body);
     return rooms.claimHost((req.params as { roomId: string }).roomId, hostToken);
@@ -93,6 +109,18 @@ export async function buildApp(deps: AppDeps): Promise<TavernApp> {
   }
 
   await app.ready();
-  const io = attachRealtime(app.server, { rooms, store, commands });
-  return { app, io, store, rooms, commands };
+  let io: TavernIo | null = null;
+  const turns = new TurnRunner({
+    db: deps.db,
+    store,
+    rooms,
+    llm: deps.llm,
+    onEvents: (roomId, events) => io?.to(roomId).emit('events', events),
+    emit: (roomId, name, payload) => io?.to(roomId).emit(name, payload as never),
+    ...(deps.random ? { random: deps.random } : {}),
+    ...(deps.gmTimeoutMs ? { timeoutMs: deps.gmTimeoutMs } : {}),
+  });
+  commands.turns = turns;
+  io = attachRealtime(app.server, { rooms, store, commands, turnStatus: (roomId) => turns.status(roomId) });
+  return { app, io, store, rooms, commands, turns };
 }

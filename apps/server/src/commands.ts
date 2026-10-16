@@ -13,7 +13,9 @@ import {
   RoomSettingsSchema,
   STAT_ROLL_NOTATION,
   buildCharacter,
+  checkProficiencies,
   checkStats,
+  findRole,
   parseDice,
   rollDice,
   rollStatPool,
@@ -26,6 +28,15 @@ import { commandLog, players, rooms } from './db/schema.ts';
 import type { AuthedPlayer } from './rooms.ts';
 
 export const COMMAND_LOG_TTL_MS = 24 * 60 * 60 * 1000;
+
+export interface TurnHooks {
+  poke(roomId: string, opts?: { newAction?: boolean }): void;
+  resolveNow(roomId: string): void;
+  retry(roomId: string): void;
+  lastNarratedTurn(roomId: string): string | null;
+  hold(roomId: string): void;
+  status(roomId: string): { status: string };
+}
 
 class CommandRejected extends Error {}
 function reject(message: string): never {
@@ -43,6 +54,8 @@ export class CommandBus {
   private readonly random: RandomInt;
   onEvents: (roomId: string, events: GameEvent[]) => void = () => {};
   onSettings: (roomId: string, settings: RoomSettings) => void = () => {};
+  /** GM turn control, wired by the app once the TurnRunner exists. */
+  turns: TurnHooks | null = null;
 
   constructor(db: Db, store: EventStore, random: RandomInt = randomInt) {
     this.db = db;
@@ -72,13 +85,26 @@ export class CommandBus {
       return { ok: false, error: 'Only the host can do that.' };
     }
     let newSettings: RoomSettings | null = null;
+    this.after = [];
 
     let appended: GameEvent[] = [];
     const result = this.db.$client.transaction((): CommandResult => {
       let res: CommandResult;
       try {
         if (cmd.type === 'set_room_mode') {
-          newSettings = this.setMode(player.roomId, cmd.mode);
+          newSettings = this.setMode(player.roomId, { mode: cmd.mode });
+        } else if (cmd.type === 'set_turn_mode') {
+          newSettings = this.setMode(player.roomId, {
+            turnMode: cmd.turnMode,
+            ...(cmd.turnWindowSeconds !== undefined ? { turnWindowSeconds: cmd.turnWindowSeconds } : {}),
+          });
+          const state = this.store.getState(player.roomId);
+          const first = state.players.find((p) => p.active && p.characterId)?.id ?? null;
+          const spotlight = cmd.turnMode === 'spotlight' ? (state.spotlight ?? first) : null;
+          if (spotlight !== state.spotlight) {
+            appended = this.store.append(player.roomId, [{ type: 'spotlight_set', actorId: player.playerId, turnId: null, payload: { playerId: spotlight } }]);
+          }
+          this.after.push(() => this.turns?.poke(player.roomId));
         } else {
           appended = this.store.append(player.roomId, this.toEvents(player, cmd));
         }
@@ -106,23 +132,26 @@ export class CommandBus {
     })();
     if (appended.length) this.onEvents(player.roomId, appended);
     if (newSettings) this.onSettings(player.roomId, newSettings);
+    if (result.ok) for (const fn of this.after) fn();
     return result;
   }
 
-  private setMode(roomId: string, mode: RoomSettings['mode']): RoomSettings {
+  private after: (() => void)[] = [];
+
+  private setMode(roomId: string, patch: Partial<Pick<RoomSettings, 'mode' | 'turnMode' | 'turnWindowSeconds'>>): RoomSettings {
     const row = this.db.select().from(rooms).where(eq(rooms.id, roomId)).get();
     if (!row) throw new CommandRejected('Room not found.');
     const current = RoomSettingsSchema.parse(JSON.parse(row.settingsJson));
     const next = RoomSettingsSchema.parse({
       ...current,
-      mode,
-      turnWindowSeconds: mode === 'solo' ? 0 : current.turnWindowSeconds || 60,
+      ...patch,
+      ...(patch.mode ? { turnWindowSeconds: patch.mode === 'solo' ? 0 : current.turnWindowSeconds || 60 } : {}),
     });
     this.db.update(rooms).set({ settingsJson: JSON.stringify(next) }).where(eq(rooms.id, roomId)).run();
     return next;
   }
 
-  private toEvents(player: AuthedPlayer, cmd: Exclude<Command, { type: 'set_room_mode' }>): EventDraft[] {
+  private toEvents(player: AuthedPlayer, cmd: Exclude<Command, { type: 'set_room_mode' | 'set_turn_mode' }>): EventDraft[] {
     const base = { actorId: player.playerId, turnId: null };
     const state = this.store.getState(player.roomId);
     const me = state.players.find((p) => p.id === player.playerId);
@@ -155,7 +184,9 @@ export class CommandBus {
       case 'create_character': {
         if (me?.characterId) reject('You already have a character.');
         const input = cmd.character;
-        const problem = checkStats(input.statMethod, input.stats, this.statPool(player) ?? undefined);
+        const problem =
+          checkStats(input.statMethod, input.stats, this.statPool(player) ?? undefined) ??
+          checkProficiencies(findRole(state.setting, input.roleName), input.skills, input.saves);
         if (problem) reject(problem);
         const character = buildCharacter(input, {
           id: newId(),
@@ -185,6 +216,94 @@ export class CommandBus {
         ];
       }
 
+      case 'submit_action': {
+        const c = state.party.find((x) => x.playerId === player.playerId);
+        if (!c) reject('Create a character first.');
+        if (state.turn.pending.some((a) => a.playerId === player.playerId)) {
+          reject('You already have an action waiting. Edit it instead.');
+        }
+        const settings = RoomSettingsSchema.parse(JSON.parse(this.room(player.roomId).settingsJson));
+        if (settings.mode !== 'solo' && settings.turnMode === 'spotlight' && state.spotlight && state.spotlight !== player.playerId) {
+          const who = state.players.find((p) => p.id === state.spotlight)?.displayName ?? 'another player';
+          reject(`It's ${who}'s turn in the spotlight.`);
+        }
+        this.after.push(() => this.turns?.poke(player.roomId, { newAction: true }));
+        return [{ ...base, type: 'action_submitted', payload: { playerId: player.playerId, characterId: c!.id, text: cmd.text } }];
+      }
+
+      case 'edit_action':
+      case 'withdraw_action': {
+        const a = state.turn.pending.find((x) => x.seq === cmd.actionSeq) ?? reject('That action has already been resolved.');
+        if (a.playerId !== player.playerId && !player.isHost) reject('You can only change your own action.');
+        this.after.push(() => this.turns?.poke(player.roomId, { newAction: cmd.type === 'edit_action' }));
+        return cmd.type === 'edit_action'
+          ? [{ ...base, type: 'action_edited', payload: { actionSeq: a.seq, text: cmd.text } }]
+          : [{ ...base, type: 'action_withdrawn', payload: { actionSeq: a.seq } }];
+      }
+
+      case 'resolve_now':
+        if (state.turn.phase === 'resolving') reject('The GM is already resolving a turn.');
+        if (state.turn.pending.length === 0) reject('No actions to resolve yet.');
+        this.after.push(() => this.turns?.resolveNow(player.roomId));
+        return [];
+
+      case 'retry_turn':
+        if (this.turns?.status(player.roomId).status !== 'failed') reject('There is nothing to retry.');
+        this.after.push(() => this.turns?.retry(player.roomId));
+        return [];
+
+      case 'void_last_turn': {
+        if (state.turn.phase === 'resolving') reject('Wait for the current turn to finish (or retry it) first.');
+        const turnId = this.turns?.lastNarratedTurn(player.roomId) ?? reject('There is no turn to rewind.');
+        this.after.push(() => this.turns?.hold(player.roomId));
+        return [{ ...base, type: 'turn_voided', payload: { turnId } }];
+      }
+
+      case 'start_session':
+        if (state.session.active) reject('A session is already running.');
+        return [{ ...base, type: 'session_started', payload: { number: state.session.number + 1 } }];
+
+      case 'end_session':
+        if (!state.session.active) reject('No session is running.');
+        return [{ ...base, type: 'session_ended', payload: { number: state.session.number } }];
+
+      case 'resolve_approval': {
+        const ap = state.pendingApprovals.find((a) => a.id === cmd.approvalId) ?? reject('That request was already handled.');
+        return [
+          {
+            ...base,
+            type: 'approval_resolved',
+            payload: {
+              approvalId: ap.id,
+              approved: cmd.approved,
+              ...(cmd.approved && cmd.item && ap.kind === 'item' ? { item: { ...cmd.item, instanceId: ap.item!.instanceId } } : {}),
+              ...(cmd.approved && cmd.ability && ap.kind === 'ability' ? { ability: { ...cmd.ability, id: ap.ability!.id } } : {}),
+            },
+          },
+        ];
+      }
+
+      case 'propose_ability': {
+        const c = ownCharacter(cmd.characterId);
+        const ability = {
+          id: newId(),
+          name: cmd.ability.name,
+          description: cmd.ability.description,
+          recharge: cmd.ability.recharge,
+          ...(cmd.ability.uses ? { uses: { current: cmd.ability.uses, max: cmd.ability.uses } } : {}),
+        };
+        if (player.isHost) {
+          return [{ ...base, type: 'host_override', payload: { override: { kind: 'add_ability', characterId: c.id, ability } } }];
+        }
+        return [
+          {
+            ...base,
+            type: 'approval_requested',
+            payload: { approval: { id: newId(), kind: 'ability', characterId: c.id, ability, reason: 'Workshopped by the player', requestedBy: 'player' } },
+          },
+        ];
+      }
+
       case 'host_override':
         return [
           {
@@ -194,6 +313,10 @@ export class CommandBus {
           },
         ];
     }
+  }
+
+  private room(roomId: string) {
+    return this.db.select().from(rooms).where(eq(rooms.id, roomId)).get() ?? reject('Room not found.');
   }
 
   /** The player's server-rolled ability scores, if they have rolled. */

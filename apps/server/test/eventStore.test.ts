@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { randomEvents } from '../../../packages/shared/test/randomEvents.ts';
 import { seededLog } from '../../../packages/shared/test/fixtures.ts';
 import { EventStore } from '../src/db/eventStore.ts';
+import { eq } from 'drizzle-orm';
 import { snapshots } from '../src/db/schema.ts';
 import { insertRoom, testDb, toDraft } from './helpers.ts';
 
@@ -101,11 +102,15 @@ describe('EventStore', () => {
     const drafts = randomEvents(120, 3).map(toDraft);
     store.append(roomId, drafts);
     const expected = replay(store.loadEvents(roomId));
-    db.update(snapshots).set({ stateJson: JSON.stringify({ ...expected, roomName: 'CORRUPT' }) }).run();
+    const latest = store.latestSnapshot(roomId)!;
+    db.update(snapshots)
+      .set({ stateJson: JSON.stringify({ ...latest.state, roomName: 'CORRUPT' }) })
+      .where(eq(snapshots.seq, latest.seq))
+      .run();
     store.forget(roomId);
     expect(store.getState(roomId).roomName).toBe('CORRUPT');
     expect(store.rebuild(roomId)).toEqual(expected);
-    expect(db.select().from(snapshots).all().map((s) => s.seq)).toEqual([120]);
+    expect(db.select().from(snapshots).all().map((s) => s.seq)).toEqual([expected.seq]);
     store.forget(roomId);
     expect(store.getState(roomId)).toEqual(expected);
   });

@@ -1,5 +1,6 @@
 import type { AppliedDelta } from './deltas.ts';
 import type { EventOf, GameEvent, HostOverride } from './events.ts';
+import { METER_ZERO_CONDITION, type MeterKey } from './constants.ts';
 import { hpPerLevel, levelForXp } from './rules.ts';
 import { type Character, type GameState, initialState } from './state.ts';
 
@@ -97,6 +98,51 @@ export function apply(state: GameState, event: GameEvent, options: ApplyOptions 
       if (!s.players.some((p) => p.id === playerId)) fail(`unknown player ${playerId}`);
       s.turn.pending.push({ seq: event.seq, playerId, characterId, text });
       if (s.turn.phase === 'idle') s.turn.phase = 'collecting';
+      break;
+    }
+
+    case 'action_edited': {
+      const a = s.turn.pending.find((x) => x.seq === event.payload.actionSeq) ?? fail(`action ${event.payload.actionSeq} is not pending`);
+      a.text = event.payload.text;
+      break;
+    }
+
+    case 'action_withdrawn': {
+      const { actionSeq } = event.payload;
+      if (!s.turn.pending.some((x) => x.seq === actionSeq)) fail(`action ${actionSeq} is not pending`);
+      s.turn.pending = s.turn.pending.filter((x) => x.seq !== actionSeq);
+      if (s.turn.phase === 'collecting' && s.turn.pending.length === 0) s.turn.phase = 'idle';
+      break;
+    }
+
+    case 'spotlight_set': {
+      const id = event.payload.playerId;
+      if (id !== null && !s.players.some((p) => p.id === id)) fail(`unknown player ${id}`);
+      s.spotlight = id;
+      break;
+    }
+
+    case 'session_started':
+      s.session = { number: event.payload.number, active: true };
+      break;
+
+    case 'session_ended':
+      s.session = { number: event.payload.number, active: false };
+      break;
+
+    case 'approval_requested':
+      s.pendingApprovals.push(structuredClone(event.payload.approval));
+      break;
+
+    case 'approval_resolved': {
+      const { approvalId, approved, item, ability } = event.payload;
+      const ap = s.pendingApprovals.find((a) => a.id === approvalId) ?? fail(`unknown approval ${approvalId}`);
+      s.pendingApprovals = s.pendingApprovals.filter((a) => a !== ap);
+      if (approved) {
+        const c = getChar(ap.characterId);
+        if (ap.kind === 'item') addItem(s, c, item ?? ap.item ?? fail('approval has no item'), fail);
+        else c.abilities.push(structuredClone(ability ?? ap.ability ?? fail('approval has no ability')));
+      }
       break;
     }
 
@@ -252,10 +298,50 @@ function applyDelta(s: GameState, d: AppliedDelta, getChar: GetChar, fail: Fail)
     case 'change_scene':
       s.scene = { locationKey: d.locationKey, title: d.title, description: d.description };
       break;
+    case 'adjust_meter':
+      setMeter(getChar(d.characterId), d.meter, (cur) => cur + d.amount, fail);
+      break;
+    case 'use_ability': {
+      const a = getChar(d.characterId).abilities.find((x) => x.id === d.abilityId) ?? fail(`unknown ability ${d.abilityId}`);
+      if (a.uses) {
+        if (a.uses.current <= 0) fail(`${a.name} has no uses left`);
+        a.uses.current -= 1;
+      }
+      break;
+    }
+    case 'spend_spell_slot': {
+      const slot = getChar(d.characterId).spellSlots[d.level - 1];
+      if (!slot || slot.current <= 0) fail(`no level ${d.level} slot left`);
+      slot!.current -= 1;
+      break;
+    }
+    case 'rest':
+      for (const id of d.characterIds) {
+        const c = getChar(id);
+        for (const a of c.abilities) {
+          if (a.uses && (a.recharge === 'short_rest' || d.kind === 'long')) a.uses.current = a.uses.max;
+        }
+        if (d.kind === 'long') {
+          c.hp.current = c.hp.max;
+          for (const slot of c.spellSlots) slot.current = slot.max;
+          if (c.meters.spirit) setMeter(c, 'spirit', (cur) => cur + 1, fail);
+        }
+      }
+      break;
     case 'upsert_canon':
       // Canon is projected into its own table by the server; not part of GameState.
       break;
   }
+}
+
+/** Clamps a meter to 0…max and keeps its zero-condition (shaken / unprepared) in step. */
+function setMeter(c: Character, meter: MeterKey, next: (current: number) => number, fail: Fail) {
+  const m = c.meters[meter] ?? fail(`${c.name} has no ${meter} meter`);
+  m.current = Math.max(0, Math.min(m.max, next(m.current)));
+  const cond = METER_ZERO_CONDITION[meter];
+  const has = c.conditions.includes(cond);
+  if (m.current === 0 && !has) c.conditions.push(cond);
+  if (m.current > 0 && has) c.conditions = c.conditions.filter((x) => x !== cond);
 }
 
 function applyOverride(s: GameState, o: HostOverride, getChar: GetChar, fail: Fail) {
@@ -277,6 +363,35 @@ function applyOverride(s: GameState, o: HostOverride, getChar: GetChar, fail: Fa
       break;
     case 'update_item':
       Object.assign(findItem(getChar(o.characterId), o.instanceId, fail), o.patch);
+      break;
+    case 'add_ability': {
+      const c = getChar(o.characterId);
+      if (c.abilities.some((a) => a.id === o.ability.id)) fail(`ability ${o.ability.id} already exists`);
+      c.abilities.push(structuredClone(o.ability));
+      break;
+    }
+    case 'update_ability': {
+      const a = getChar(o.characterId).abilities.find((x) => x.id === o.abilityId) ?? fail(`unknown ability ${o.abilityId}`);
+      Object.assign(a, structuredClone(o.patch));
+      break;
+    }
+    case 'remove_ability': {
+      const c = getChar(o.characterId);
+      if (!c.abilities.some((a) => a.id === o.abilityId)) fail(`unknown ability ${o.abilityId}`);
+      c.abilities = c.abilities.filter((a) => a.id !== o.abilityId);
+      break;
+    }
+    case 'spell_slots':
+      getChar(o.characterId).spellSlots = o.slots.map((x) => ({ max: x.max, current: Math.min(x.current, x.max) }));
+      break;
+    case 'meter': {
+      const c = getChar(o.characterId);
+      c.meters[o.meter] ??= { current: 5, max: 5 };
+      setMeter(c, o.meter, () => o.current, fail);
+      break;
+    }
+    case 'proficiencies':
+      getChar(o.characterId).proficiencies = { skills: [...o.skills], saves: [...o.saves] };
       break;
     case 'setting':
       s.setting = structuredClone(o.setting);

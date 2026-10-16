@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { LIMITS, STAT_KEYS, type StatKey } from './constants.ts';
+import { LIMITS, METER_MAX, SKILL_KEYS, STAT_KEYS, type SkillKey, type StatKey } from './constants.ts';
 import { type DiceRoll, type RandomInt, type RollMode, rollDice } from './dice.ts';
-import type { SettingPreset } from './preset.ts';
+import type { Role, SettingPreset } from './preset.ts';
 import { statModifier } from './rules.ts';
-import { type Character, type Stats, StatsSchema } from './state.ts';
+import { type Character, type Stats, SkillKeySchema, StatKeySchema, StatsSchema } from './state.ts';
 
 /** Character creation rules (spec Addendum A10). Pure; the server validates with these. */
 
@@ -29,6 +29,10 @@ export const CharacterCreateSchema = z
     customKit: z.array(itemName).max(MAX_CUSTOM_KIT).optional(),
     statMethod: z.enum(STAT_METHODS),
     stats: StatsSchema,
+    /** Chosen skill proficiencies (count and choices come from the role). */
+    skills: z.array(SkillKeySchema).max(4).default([]),
+    /** Saving-throw proficiencies; only used for custom classes (roles fix their saves). */
+    saves: z.array(StatKeySchema).max(2).default([]),
     visualDescriptor: z.string().trim().max(LIMITS.visualDescriptor).default(''),
     notes: z.string().trim().max(LIMITS.characterNotes).default(''),
     personalItem: z
@@ -83,25 +87,52 @@ export function rollStatPool(randomInt: RandomInt): DiceRoll[] {
   });
 }
 
+/** Validates skill and save choices against the role (or the custom-class rule: any 2 + any 2). */
+export function checkProficiencies(role: Role | undefined, skills: readonly SkillKey[], saves: readonly StatKey[]): string | null {
+  const count = role ? role.skillCount : 2;
+  const choices: readonly SkillKey[] = role && role.skillChoices.length ? role.skillChoices : SKILL_KEYS;
+  if (new Set(skills).size !== skills.length) return 'Pick different skills.';
+  if (skills.length !== count) return `Pick ${count} skill${count === 1 ? '' : 's'}.`;
+  if (skills.some((s) => !choices.includes(s))) return 'That skill is not available to this role.';
+  if (!role || role.saves.length < 2) {
+    if (saves.length !== 2 || saves[0] === saves[1]) return 'Pick two different saving throws.';
+  }
+  return null;
+}
+
 export function findRole(preset: SettingPreset | null, roleName: string | undefined) {
   if (!preset || !roleName) return undefined;
   return preset.roles.find((r) => r.name.toLowerCase() === roleName.trim().toLowerCase());
 }
 
-/** Derives a full level-1 Character. Callers must have run checkStats first. */
+/** Derives a full level-1 Character. Callers must have run checkStats and checkProficiencies first. */
 export function buildCharacter(
   input: CharacterCreateInput,
   ctx: { id: string; playerId: string; preset: SettingPreset | null; newItemId: () => string },
 ): Character {
   const role = findRole(ctx.preset, input.roleName);
-  const kit = role ? role.startingKit.map((name) => ({ name, tags: ['starting'] })) : (input.customKit ?? []).map((name) => ({ name, tags: ['custom'] }));
-  const inventory: Character['inventory'] = kit.map((k) => ({
-    instanceId: ctx.newItemId(),
-    name: k.name,
-    qty: 1,
-    equipped: false,
-    tags: k.tags,
-  }));
+  const catalogue = ctx.preset?.items ?? [];
+  const kit = role
+    ? role.startingKit.map((name) => ({ name, tags: ['starting'] }))
+    : (input.customKit ?? []).map((name) => ({ name, tags: ['custom'] }));
+  const equippedSlots = new Set<string>();
+  const inventory: Character['inventory'] = kit.map((k) => {
+    const t = catalogue.find((x) => x.name.toLowerCase() === k.name.toLowerCase());
+    // Starting armour, shield and first weapon go on automatically.
+    const equip = !!t?.slot && t.slot !== 'other' && !equippedSlots.has(t.slot);
+    if (equip) equippedSlots.add(t!.slot!);
+    return {
+      instanceId: ctx.newItemId(),
+      name: t?.name ?? k.name,
+      qty: 1,
+      equipped: equip,
+      tags: k.tags,
+      ...(t?.slot ? { slot: t.slot } : {}),
+      ...(t?.effects ? { effects: structuredClone(t.effects) } : {}),
+      ...(t?.rarity ? { rarity: t.rarity } : {}),
+      ...(t?.notes ? { notes: t.notes } : {}),
+    };
+  });
   if (input.personalItem) {
     inventory.push({
       instanceId: ctx.newItemId(),
@@ -113,6 +144,8 @@ export function buildCharacter(
     });
   }
   const maxHp = Math.max(1, 10 + statModifier(input.stats.con));
+  const meters: Character['meters'] = {};
+  for (const m of ctx.preset?.meters ?? []) meters[m] = { current: METER_MAX, max: METER_MAX };
   return {
     id: ctx.id,
     playerId: ctx.playerId,
@@ -122,13 +155,26 @@ export function buildCharacter(
     level: 1,
     xp: 0,
     hp: { current: maxHp, max: maxHp },
-    ac: Math.max(1, 10 + statModifier(input.stats.dex)),
+    ac: 10,
     stats: { ...input.stats },
     gold: STARTING_GOLD,
     inventory,
     conditions: [],
     visualDescriptor: input.visualDescriptor,
     notes: input.notes,
+    proficiencies: {
+      skills: [...input.skills],
+      saves: role && role.saves.length === 2 ? [...role.saves] : [...input.saves],
+    },
+    abilities: (role?.abilities ?? []).map((a) => ({
+      id: ctx.newItemId(),
+      name: a.name,
+      description: a.description,
+      recharge: a.recharge,
+      ...(a.uses ? { uses: { current: a.uses, max: a.uses } } : {}),
+    })),
+    spellSlots: (role?.spellSlots ?? []).map((n) => ({ current: n, max: n })),
+    meters,
   };
 }
 

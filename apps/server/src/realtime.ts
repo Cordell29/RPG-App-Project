@@ -4,6 +4,7 @@ import {
   type GameEvent,
   type ServerToClientEvents,
   type SyncMessage,
+  type TurnStatus,
   CATCH_UP_SNAPSHOT_THRESHOLD,
   SocketAuthSchema,
   initialState,
@@ -23,7 +24,7 @@ export type TavernIo = Server<ClientToServerEvents, ServerToClientEvents, Record
  */
 export function attachRealtime(
   httpServer: HttpServer,
-  deps: { rooms: RoomService; store: EventStore; commands: CommandBus },
+  deps: { rooms: RoomService; store: EventStore; commands: CommandBus; turnStatus: (roomId: string) => TurnStatus },
 ): TavernIo {
   const { rooms, store, commands } = deps;
   const io: TavernIo = new Server(httpServer, { serveClient: false, cors: { origin: false } });
@@ -47,6 +48,7 @@ export function attachRealtime(
       inviteCode: room.inviteCode ?? '',
       you: { playerId: player.playerId, isHost: player.isHost },
       online: onlineIds(player.roomId),
+      turnStatus: deps.turnStatus(player.roomId),
     };
     let msg: SyncMessage;
     if (fromSeq > state.seq) {

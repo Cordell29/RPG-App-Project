@@ -4,6 +4,10 @@ import {
   CharacterCreateSchema,
   LIMITS,
   MAX_CUSTOM_KIT,
+  SKILL_KEYS,
+  type SkillKey,
+  type StatKey,
+  STAT_KEYS,
   assignByPriority,
   findRole,
 } from '@tavern/shared';
@@ -22,6 +26,7 @@ const DraftSchema = z.object({
   className: z.string(),
   roleName: z.string(),
   statPriority: z.array(z.string()),
+  skills: z.array(z.string()),
   visualDescriptor: z.string(),
   backstory: z.string(),
   personalItemName: z.string(),
@@ -41,6 +46,8 @@ Fill every field:
 - name, ancestry (people/species/origin; may be empty), className.
 - roleName: the closest available role name exactly as listed, or "" if none fits.
   If roleName is "", className is a short custom class and customKit lists 3–${MAX_CUSTOM_KIT} ordinary items; otherwise customKit is [].
+- skills: the skill keys this character is trained in. Pick from the role's skill list if a role fits.
+  Skill keys: ${SKILL_KEYS.join(', ')}.
 - statPriority: all six stat keys ordered from strongest to weakest:
   ${stat('str', 'physical power')}, ${stat('dex', 'agility')}, ${stat('con', 'toughness')},
   ${stat('int', 'reasoning')}, ${stat('wis', 'perception')}, ${stat('cha', 'personality')}.
@@ -57,6 +64,12 @@ const clip = (s: string, n: number) => s.trim().slice(0, n).trim();
 export function draftToInput(d: CharacterDraftRaw, preset: SettingPreset | null): CharacterCreateInput {
   const role = findRole(preset, d.roleName);
   const personal = clip(d.personalItemName, LIMITS.itemName);
+  // Skills: the model's picks if legal for the role, topped up from the role's list.
+  const count = role ? role.skillCount : 2;
+  const pool: readonly SkillKey[] = role && role.skillChoices.length ? role.skillChoices : SKILL_KEYS;
+  const skills = [...new Set(d.skills.filter((k): k is SkillKey => (pool as readonly string[]).includes(k)))];
+  for (const k of pool) if (skills.length < count && !skills.includes(k)) skills.push(k);
+  const priority = d.statPriority.filter((k): k is StatKey => (STAT_KEYS as readonly string[]).includes(k));
   return CharacterCreateSchema.parse({
     name: clip(d.name, LIMITS.name) || 'Unnamed',
     ancestry: clip(d.ancestry, LIMITS.name),
@@ -66,6 +79,9 @@ export function draftToInput(d: CharacterDraftRaw, preset: SettingPreset | null)
       : { customKit: d.customKit.map((i) => clip(i, LIMITS.itemName)).filter(Boolean).slice(0, MAX_CUSTOM_KIT) }),
     statMethod: 'standard',
     stats: assignByPriority(d.statPriority),
+    skills: skills.slice(0, count),
+    // Custom classes: proficient in their two strongest saves.
+    saves: role ? [] : [...new Set([...priority, ...STAT_KEYS])].slice(0, 2),
     visualDescriptor: clip(d.visualDescriptor, LIMITS.visualDescriptor),
     notes: clip(d.backstory, LIMITS.characterNotes),
     ...(personal ? { personalItem: { name: personal, notes: clip(d.personalItemNotes, LIMITS.itemNotes) } } : {}),
@@ -104,6 +120,7 @@ export function mockCharacterDraft(description: string): CharacterDraftRaw {
     className: 'Fighter',
     roleName: 'Fighter',
     statPriority: ['str', 'con', 'dex', 'wis', 'cha', 'int'],
+    skills: ['athletics', 'perception'],
     visualDescriptor: 'Weathered traveller in a patched cloak.',
     backstory: `Drafted from: ${description.replace(/<[^>]+>/g, '').trim().slice(0, 300)}`,
     personalItemName: 'Worn coin',

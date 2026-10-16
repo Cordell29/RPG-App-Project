@@ -187,6 +187,170 @@ forType('item_equipped', () => {
   });
 });
 
+forType('action_edited', () => {
+  it('rewrites a pending action; unknown seqs throw', () => {
+    const log = seededLog();
+    log.push('action_submitted', { playerId: 'p1', characterId: 'c1', text: 'I climb' }); // 6
+    log.push('action_edited', { actionSeq: 6, text: 'I climb carefully' }, { actorId: 'p1' });
+    expect(replay(log.events).turn.pending[0]!.text).toBe('I climb carefully');
+    log.push('action_edited', { actionSeq: 99, text: 'x' });
+    expect(() => replay(log.events)).toThrow(/not pending/);
+  });
+});
+
+forType('action_withdrawn', () => {
+  it('removes a pending action and goes idle when none remain', () => {
+    const log = seededLog();
+    log.push('action_submitted', { playerId: 'p1', characterId: 'c1', text: 'I climb' }); // 6
+    log.push('action_withdrawn', { actionSeq: 6 });
+    expect(replay(log.events).turn).toMatchObject({ pending: [], phase: 'idle' });
+  });
+});
+
+forType('spotlight_set', () => {
+  it('sets and clears the spotlight', () => {
+    const log = seededLog();
+    log.push('spotlight_set', { playerId: 'p2' });
+    expect(replay(log.events).spotlight).toBe('p2');
+    log.push('spotlight_set', { playerId: null });
+    expect(replay(log.events).spotlight).toBeNull();
+    log.push('spotlight_set', { playerId: 'ghost' });
+    expect(() => replay(log.events)).toThrow(ReducerError);
+  });
+});
+
+forType('session_started', () => {
+  it('opens a numbered session', () => {
+    const log = seededLog();
+    log.push('session_started', { number: 1 });
+    expect(replay(log.events).session).toEqual({ number: 1, active: true });
+  });
+});
+
+forType('session_ended', () => {
+  it('closes the session', () => {
+    const log = seededLog();
+    log.push('session_started', { number: 1 });
+    log.push('session_ended', { number: 1 });
+    expect(replay(log.events).session).toEqual({ number: 1, active: false });
+  });
+});
+
+const rareSword = { instanceId: 'rs', name: 'Flametongue', qty: 1, equipped: false, tags: [], slot: 'weapon' as const, rarity: 'rare' as const, effects: { damage: '1d8', damageStat: 'str' as const, attackBonus: 2 } };
+
+forType('approval_requested', () => {
+  it('queues the request for the host', () => {
+    const log = seededLog();
+    log.push('approval_requested', { approval: { id: 'ap1', kind: 'item', characterId: 'c1', item: rareSword, reason: 'dragon hoard', requestedBy: 'gm' } });
+    expect(replay(log.events).pendingApprovals.map((a) => a.id)).toEqual(['ap1']);
+  });
+});
+
+forType('approval_resolved', () => {
+  it('approved items and abilities are granted (with host edits); denied ones vanish', () => {
+    const log = seededLog();
+    log.push('approval_requested', { approval: { id: 'ap1', kind: 'item', characterId: 'c1', item: rareSword, reason: '', requestedBy: 'gm' } });
+    log.push('approval_requested', {
+      approval: { id: 'ap2', kind: 'ability', characterId: 'c2', ability: { id: 'ab1', name: 'Shadow Step', description: 'Teleport 30 ft between shadows.', uses: { current: 1, max: 1 }, recharge: 'short_rest' }, reason: '', requestedBy: 'player' },
+    });
+    log.push('approval_requested', { approval: { id: 'ap3', kind: 'item', characterId: 'c1', item: { ...rareSword, instanceId: 'rs2' }, reason: '', requestedBy: 'gm' } });
+    log.push('approval_resolved', { approvalId: 'ap1', approved: true, item: { ...rareSword, name: 'Flametongue (+2)' } });
+    log.push('approval_resolved', { approvalId: 'ap2', approved: true });
+    log.push('approval_resolved', { approvalId: 'ap3', approved: false });
+    const s = replay(log.events);
+    expect(s.pendingApprovals).toEqual([]);
+    expect(char(s, 'c1').inventory.map((i) => i.name)).toEqual(['Flametongue (+2)']);
+    expect(char(s, 'c2').abilities.map((a) => a.name)).toEqual(['Shadow Step']);
+    log.push('approval_resolved', { approvalId: 'ap1', approved: true });
+    expect(() => replay(log.events)).toThrow(/approval/);
+  });
+});
+
+describe('Phase 4 deltas', () => {
+  function withKit() {
+    const log = seededLog();
+    log.push('host_override', {
+      override: { kind: 'spell_slots', characterId: 'c1', slots: [{ current: 2, max: 2 }, { current: 1, max: 1 }] },
+    });
+    log.push('host_override', {
+      override: { kind: 'add_ability', characterId: 'c1', ability: { id: 'sw', name: 'Second Wind', description: 'Heal.', uses: { current: 1, max: 1 }, recharge: 'short_rest' } },
+    });
+    log.push('host_override', {
+      override: { kind: 'add_ability', characterId: 'c1', ability: { id: 'ai', name: 'Arcane Recovery', description: 'Slots.', uses: { current: 1, max: 1 }, recharge: 'long_rest' } },
+    });
+    return log;
+  }
+
+  it('use_ability spends a use; none left throws', () => {
+    const log = withKit();
+    log.push('delta_applied', { delta: { type: 'use_ability', characterId: 'c1', abilityId: 'sw' } });
+    expect(char(replay(log.events), 'c1').abilities[0]!.uses).toEqual({ current: 0, max: 1 });
+    log.push('delta_applied', { delta: { type: 'use_ability', characterId: 'c1', abilityId: 'sw' } });
+    expect(() => replay(log.events)).toThrow(/no uses/);
+  });
+
+  it('spend_spell_slot spends a slot of that level; empty throws', () => {
+    const log = withKit();
+    log.push('delta_applied', { delta: { type: 'spend_spell_slot', characterId: 'c1', level: 2 } });
+    expect(char(replay(log.events), 'c1').spellSlots[1]).toEqual({ current: 0, max: 1 });
+    log.push('delta_applied', { delta: { type: 'spend_spell_slot', characterId: 'c1', level: 2 } });
+    expect(() => replay(log.events)).toThrow(/slot/);
+    const none = withKit();
+    none.push('delta_applied', { delta: { type: 'spend_spell_slot', characterId: 'c1', level: 5 } });
+    expect(() => replay(none.events)).toThrow(/slot/);
+  });
+
+  it('short rest restores short-rest uses; long rest restores everything and HP', () => {
+    const log = withKit();
+    log.push('delta_applied', { delta: { type: 'use_ability', characterId: 'c1', abilityId: 'sw' } });
+    log.push('delta_applied', { delta: { type: 'use_ability', characterId: 'c1', abilityId: 'ai' } });
+    log.push('delta_applied', { delta: { type: 'spend_spell_slot', characterId: 'c1', level: 1 } });
+    log.push('delta_applied', { delta: { type: 'modify_hp', characterId: 'c1', amount: -7 } });
+    log.push('delta_applied', { delta: { type: 'rest', kind: 'short', characterIds: ['c1'] } });
+    let c = char(replay(log.events), 'c1');
+    expect(c.abilities.map((a) => a.uses!.current)).toEqual([1, 0]);
+    expect(c.spellSlots[0]!.current).toBe(1);
+    expect(c.hp.current).toBe(5);
+    log.push('delta_applied', { delta: { type: 'rest', kind: 'long', characterIds: ['c1'] } });
+    c = char(replay(log.events), 'c1');
+    expect(c.abilities.map((a) => a.uses!.current)).toEqual([1, 1]);
+    expect(c.spellSlots.map((x) => x.current)).toEqual([2, 1]);
+    expect(c.hp.current).toBe(12);
+  });
+
+  it('adjust_meter clamps 0–max and toggles shaken / unprepared at zero', () => {
+    const log = seededLog();
+    log.push('host_override', { override: { kind: 'meter', characterId: 'c1', meter: 'spirit', current: 2 } });
+    log.push('delta_applied', { delta: { type: 'adjust_meter', characterId: 'c1', meter: 'spirit', amount: -3 } });
+    let c = char(replay(log.events), 'c1');
+    expect(c.meters.spirit).toEqual({ current: 0, max: 5 });
+    expect(c.conditions).toContain('shaken');
+    log.push('delta_applied', { delta: { type: 'adjust_meter', characterId: 'c1', meter: 'spirit', amount: 9 } });
+    c = char(replay(log.events), 'c1');
+    expect(c.meters.spirit!.current).toBe(5);
+    expect(c.conditions).not.toContain('shaken');
+    log.push('delta_applied', { delta: { type: 'adjust_meter', characterId: 'c2', meter: 'supply', amount: -1 } });
+    expect(() => replay(log.events)).toThrow(/supply/);
+  });
+
+  it('long rest raises Spirit by 1', () => {
+    const log = seededLog();
+    log.push('host_override', { override: { kind: 'meter', characterId: 'c1', meter: 'spirit', current: 1 } });
+    log.push('delta_applied', { delta: { type: 'rest', kind: 'long', characterIds: ['c1'] } });
+    expect(char(replay(log.events), 'c1').meters.spirit!.current).toBe(2);
+  });
+
+  it('host can update and remove abilities and set proficiencies', () => {
+    const log = withKit();
+    log.push('host_override', { override: { kind: 'update_ability', characterId: 'c1', abilityId: 'sw', patch: { description: 'Heal 1d10+level.' } } });
+    log.push('host_override', { override: { kind: 'remove_ability', characterId: 'c1', abilityId: 'ai' } });
+    log.push('host_override', { override: { kind: 'proficiencies', characterId: 'c1', skills: ['stealth'], saves: ['dex'] } });
+    const c = char(replay(log.events), 'c1');
+    expect(c.abilities).toEqual([{ id: 'sw', name: 'Second Wind', description: 'Heal 1d10+level.', uses: { current: 1, max: 1 }, recharge: 'short_rest' }]);
+    expect(c.proficiencies).toEqual({ skills: ['stealth'], saves: ['dex'] });
+  });
+});
+
 forType('chat_message', () => {
   it('changes nothing but seq', () => {
     const { before, after } = step(seededLog(), (l) =>

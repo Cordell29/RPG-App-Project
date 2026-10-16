@@ -17,3 +17,8 @@ export function levelForXp(xp: number): number {
 export function hpPerLevel(con: number): number {
   return Math.max(1, 5 + statModifier(con));
 }
+
+/** 5e proficiency bonus: +2 at levels 1–4, +3 at 5–8, … +6 at 17–20. */
+export function proficiencyBonus(level: number): number {
+  return 2 + Math.floor((Math.max(1, level) - 1) / 4);
+}

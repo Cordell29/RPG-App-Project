@@ -18,10 +18,71 @@ export const CONDITIONS = [
   'poisoned',
   'prone',
   'restrained',
+  'shaken',
   'stunned',
   'unconscious',
+  'unprepared',
 ] as const;
 export type Condition = (typeof CONDITIONS)[number];
+
+/** The 18 5e skills and their governing stat. Presets rename them; keys never change. */
+export const SKILLS = {
+  acrobatics: 'dex',
+  animal_handling: 'wis',
+  arcana: 'int',
+  athletics: 'str',
+  deception: 'cha',
+  history: 'int',
+  insight: 'wis',
+  intimidation: 'cha',
+  investigation: 'int',
+  medicine: 'wis',
+  nature: 'int',
+  perception: 'wis',
+  performance: 'cha',
+  persuasion: 'cha',
+  religion: 'int',
+  sleight_of_hand: 'dex',
+  stealth: 'dex',
+  survival: 'wis',
+} as const satisfies Record<string, StatKey>;
+export type SkillKey = keyof typeof SKILLS;
+export const SKILL_KEYS = Object.keys(SKILLS) as [SkillKey, ...SkillKey[]];
+
+export const DEFAULT_SKILL_LABELS: Record<SkillKey, string> = {
+  acrobatics: 'Acrobatics',
+  animal_handling: 'Animal Handling',
+  arcana: 'Arcana',
+  athletics: 'Athletics',
+  deception: 'Deception',
+  history: 'History',
+  insight: 'Insight',
+  intimidation: 'Intimidation',
+  investigation: 'Investigation',
+  medicine: 'Medicine',
+  nature: 'Nature',
+  perception: 'Perception',
+  performance: 'Performance',
+  persuasion: 'Persuasion',
+  religion: 'Religion',
+  sleight_of_hand: 'Sleight of Hand',
+  stealth: 'Stealth',
+  survival: 'Survival',
+};
+
+/** Starforged-style meters (sci-fi). 0–5; at 0 the paired condition applies. */
+export const METERS = ['spirit', 'supply'] as const;
+export type MeterKey = (typeof METERS)[number];
+export const METER_MAX = 5;
+export const METER_ZERO_CONDITION: Record<MeterKey, 'shaken' | 'unprepared'> = { spirit: 'shaken', supply: 'unprepared' };
+
+export const ITEM_SLOTS = ['armor', 'shield', 'weapon', 'other'] as const;
+export const RARITIES = ['mundane', 'uncommon', 'rare', 'very_rare'] as const;
+export type Rarity = (typeof RARITIES)[number];
+/** Highest bonus the GM may grant without host approval (uncommon). */
+export const GM_MAX_ITEM_POWER = 1;
+export const RECHARGES = ['at_will', 'short_rest', 'long_rest'] as const;
+export const MAX_SPELL_LEVEL = 9;
 
 export const CANON_KINDS = ['npc', 'location', 'faction', 'lore'] as const;
 export type CanonKind = (typeof CANON_KINDS)[number];

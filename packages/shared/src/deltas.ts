@@ -1,6 +1,7 @@
 import { z } from 'zod';
-import { CANON_KINDS, FLAG_KEY_RE, LIMITS, QUEST_STATUSES, STAT_KEYS } from './constants.ts';
+import { CANON_KINDS, FLAG_KEY_RE, LIMITS, METERS, QUEST_STATUSES } from './constants.ts';
 import { ConditionSchema, FlagValueSchema, IdSchema, ItemSchema } from './state.ts';
+export { StatKeySchema } from './state.ts';
 
 /**
  * Applied deltas: the resolved, server-validated form stored in delta_applied events.
@@ -69,6 +70,27 @@ export const AppliedDeltaSchema = z.discriminatedUnion('type', [
     description: z.string().max(LIMITS.sceneDescription),
   }),
   z.object({
+    type: z.literal('adjust_meter'),
+    characterId: IdSchema,
+    meter: z.enum(METERS),
+    amount: z.number().int(),
+  }),
+  z.object({
+    type: z.literal('use_ability'),
+    characterId: IdSchema,
+    abilityId: IdSchema,
+  }),
+  z.object({
+    type: z.literal('spend_spell_slot'),
+    characterId: IdSchema,
+    level: z.number().int().min(1).max(9),
+  }),
+  z.object({
+    type: z.literal('rest'),
+    kind: z.enum(['short', 'long']),
+    characterIds: z.array(IdSchema).min(1).max(6),
+  }),
+  z.object({
     type: z.literal('upsert_canon'),
     kind: z.enum(CANON_KINDS),
     key: z.string().min(1).max(80),
@@ -79,4 +101,3 @@ export const AppliedDeltaSchema = z.discriminatedUnion('type', [
 export type AppliedDelta = z.infer<typeof AppliedDeltaSchema>;
 export type AppliedDeltaType = AppliedDelta['type'];
 
-export const StatKeySchema = z.enum(STAT_KEYS);

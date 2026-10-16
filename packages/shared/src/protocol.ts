@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import { LIMITS } from './constants.ts';
 import { CharacterCreateSchema } from './character.ts';
+import { RECHARGES } from './constants.ts';
 import { type GameEvent, HostOverrideSchema } from './events.ts';
+import { AbilitySchema, ItemSchema } from './state.ts';
 import type { RoomSettings } from './room.ts';
 import type { GameState } from './state.ts';
 
@@ -51,6 +53,44 @@ export const CommandSchema = z.discriminatedUnion('type', [
     instanceId: z.string().min(1).max(64),
     equipped: z.boolean(),
   }),
+  z.object({ commandId, type: z.literal('submit_action'), text: z.string().trim().min(1).max(LIMITS.actionLength) }),
+  z.object({
+    commandId,
+    type: z.literal('edit_action'),
+    actionSeq: z.number().int().positive(),
+    text: z.string().trim().min(1).max(LIMITS.actionLength),
+  }),
+  z.object({ commandId, type: z.literal('withdraw_action'), actionSeq: z.number().int().positive() }),
+  z.object({ commandId, type: z.literal('resolve_now') }),
+  z.object({ commandId, type: z.literal('retry_turn') }),
+  z.object({ commandId, type: z.literal('void_last_turn') }),
+  z.object({
+    commandId,
+    type: z.literal('set_turn_mode'),
+    turnMode: z.enum(['round', 'spotlight']),
+    turnWindowSeconds: z.number().int().min(0).max(600).optional(),
+  }),
+  z.object({ commandId, type: z.literal('start_session') }),
+  z.object({ commandId, type: z.literal('end_session') }),
+  z.object({
+    commandId,
+    type: z.literal('resolve_approval'),
+    approvalId: z.string().min(1).max(64),
+    approved: z.boolean(),
+    item: ItemSchema.optional(),
+    ability: AbilitySchema.optional(),
+  }),
+  z.object({
+    commandId,
+    type: z.literal('propose_ability'),
+    characterId: z.string().min(1).max(64),
+    ability: z.object({
+      name: z.string().trim().min(1).max(80),
+      description: z.string().trim().min(1).max(600),
+      uses: z.number().int().min(1).max(20).optional(),
+      recharge: z.enum(RECHARGES).default('at_will'),
+    }),
+  }),
   z.object({
     commandId,
     type: z.literal('host_override'),
@@ -61,7 +101,28 @@ export const CommandSchema = z.discriminatedUnion('type', [
 export type Command = z.infer<typeof CommandSchema>;
 
 /** Commands only the host may send. */
-export const HOST_COMMANDS: readonly CommandType[] = ['set_room_mode', 'host_override'];
+export const HOST_COMMANDS: readonly CommandType[] = [
+  'set_room_mode',
+  'host_override',
+  'resolve_now',
+  'retry_turn',
+  'void_last_turn',
+  'set_turn_mode',
+  'start_session',
+  'end_session',
+  'resolve_approval',
+];
+
+/** Ephemeral GM status, broadcast to the room (not stored). */
+export interface TurnStatus {
+  status: 'idle' | 'collecting' | 'adjudicating' | 'narrating' | 'failed';
+  turnId?: string;
+  /** Round mode: epoch ms when the window closes. */
+  deadline?: number;
+  error?: string;
+  /** Which step failed, so Retry knows what to redo. */
+  stage?: 'adjudicate' | 'narrate';
+}
 export type CommandType = Command['type'];
 
 export type CommandResult = { ok: true; seqs: number[] } | { ok: false; error: string };
@@ -80,6 +141,7 @@ export interface SyncMessage {
   inviteCode: string;
   you: PlayerInfo;
   online: string[];
+  turnStatus: TurnStatus;
 }
 
 export interface ServerToClientEvents {
@@ -88,6 +150,9 @@ export interface ServerToClientEvents {
   presence: (msg: { online: string[] }) => void;
   /** Operational settings changed (not part of the event log). */
   settings: (settings: RoomSettings) => void;
+  turn_status: (status: TurnStatus) => void;
+  /** Streamed narration text (delta) for the turn being narrated. */
+  narration_chunk: (msg: { turnId: string; delta: string }) => void;
 }
 
 export interface ClientToServerEvents {

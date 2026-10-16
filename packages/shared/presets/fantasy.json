@@ -20,7 +20,36 @@
         "Shield",
         "Chain shirt",
         "Rations (3 days)"
-      ]
+      ],
+      "skillChoices": [
+        "acrobatics",
+        "animal_handling",
+        "athletics",
+        "history",
+        "insight",
+        "intimidation",
+        "perception",
+        "survival"
+      ],
+      "skillCount": 2,
+      "saves": [
+        "str",
+        "con"
+      ],
+      "abilities": [
+        {
+          "name": "Second Wind",
+          "description": "Bonus action: regain 1d10 + your level in HP.",
+          "uses": 1,
+          "recharge": "short_rest"
+        },
+        {
+          "name": "Fighting Style: Defence",
+          "description": "While wearing armour you gain +1 AC (the GM applies this).",
+          "recharge": "at_will"
+        }
+      ],
+      "spellSlots": []
     },
     {
       "name": "Rogue",
@@ -28,9 +57,40 @@
       "startingKit": [
         "Shortsword",
         "Dagger",
-        "Thieves' tools",
-        "Dark hooded cloak"
-      ]
+        "Leather armor",
+        "Thieves' tools"
+      ],
+      "skillChoices": [
+        "acrobatics",
+        "athletics",
+        "deception",
+        "insight",
+        "intimidation",
+        "investigation",
+        "perception",
+        "performance",
+        "persuasion",
+        "sleight_of_hand",
+        "stealth"
+      ],
+      "skillCount": 4,
+      "saves": [
+        "dex",
+        "int"
+      ],
+      "abilities": [
+        {
+          "name": "Sneak Attack",
+          "description": "Once per turn, deal an extra 1d6 damage with a finesse or ranged weapon if you have advantage or an ally is next to the target.",
+          "recharge": "at_will"
+        },
+        {
+          "name": "Thieves' Cant",
+          "description": "You know the secret signs and slang of thieves.",
+          "recharge": "at_will"
+        }
+      ],
+      "spellSlots": []
     },
     {
       "name": "Wizard",
@@ -39,7 +99,36 @@
         "Quarterstaff",
         "Spellbook",
         "Component pouch",
-        "Ink and quill"
+        "Robes"
+      ],
+      "skillChoices": [
+        "arcana",
+        "history",
+        "insight",
+        "investigation",
+        "medicine",
+        "religion"
+      ],
+      "skillCount": 2,
+      "saves": [
+        "int",
+        "wis"
+      ],
+      "abilities": [
+        {
+          "name": "Spellcasting (Intelligence)",
+          "description": "Cantrips: Fire Bolt (1d10 fire, ranged spell attack), Mage Hand, Light. 1st-level spells prepared: Magic Missile (three darts, 1d4+1 force each, never miss), Shield (reaction, +5 AC until your next turn), Sleep, Detect Magic. Spell attack = Int mod + proficiency; save DC = 8 + Int mod + proficiency.",
+          "recharge": "at_will"
+        },
+        {
+          "name": "Arcane Recovery",
+          "description": "Once per day during a short rest, recover one spent 1st-level spell slot.",
+          "uses": 1,
+          "recharge": "long_rest"
+        }
+      ],
+      "spellSlots": [
+        2
       ]
     },
     {
@@ -47,9 +136,36 @@
       "summary": "A servant of a higher power who heals, wards and smites.",
       "startingKit": [
         "Mace",
-        "Holy symbol",
-        "Healer's kit",
-        "Scale mail"
+        "Scale mail",
+        "Shield",
+        "Holy symbol"
+      ],
+      "skillChoices": [
+        "history",
+        "insight",
+        "medicine",
+        "persuasion",
+        "religion"
+      ],
+      "skillCount": 2,
+      "saves": [
+        "wis",
+        "cha"
+      ],
+      "abilities": [
+        {
+          "name": "Spellcasting (Wisdom)",
+          "description": "Cantrips: Sacred Flame (1d8 radiant, Dex save), Guidance, Light. 1st-level spells prepared: Cure Wounds (1d8 + Wis mod healing), Healing Word (bonus action, 1d4 + Wis mod at range), Bless, Guiding Bolt (4d6 radiant). Save DC = 8 + Wis mod + proficiency.",
+          "recharge": "at_will"
+        },
+        {
+          "name": "Disciple of Life",
+          "description": "Healing spells restore an extra 2 + the spell's level in HP.",
+          "recharge": "at_will"
+        }
+      ],
+      "spellSlots": [
+        2
       ]
     },
     {
@@ -57,19 +173,69 @@
       "summary": "A wilderness tracker and archer at home far from roads.",
       "startingKit": [
         "Longbow",
-        "Quiver of arrows",
-        "Hunting knife",
+        "Shortsword",
+        "Leather armor",
         "Bedroll"
-      ]
+      ],
+      "skillChoices": [
+        "animal_handling",
+        "athletics",
+        "insight",
+        "investigation",
+        "nature",
+        "perception",
+        "stealth",
+        "survival"
+      ],
+      "skillCount": 3,
+      "saves": [
+        "str",
+        "dex"
+      ],
+      "abilities": [
+        {
+          "name": "Favoured Enemy",
+          "description": "Choose a creature type with the GM: advantage on Survival to track them and on Intelligence checks to recall facts about them.",
+          "recharge": "at_will"
+        },
+        {
+          "name": "Natural Explorer",
+          "description": "In your favoured terrain, difficult terrain doesn't slow your group and you can't get lost except by magic.",
+          "recharge": "at_will"
+        }
+      ],
+      "spellSlots": []
     },
     {
       "name": "Bard",
       "summary": "A performer whose stories and songs carry real power.",
       "startingKit": [
-        "Lute",
         "Rapier",
-        "Fine clothes",
-        "Letter of introduction"
+        "Leather armor",
+        "Lute",
+        "Fine clothes"
+      ],
+      "skillChoices": [],
+      "skillCount": 3,
+      "saves": [
+        "dex",
+        "cha"
+      ],
+      "abilities": [
+        {
+          "name": "Bardic Inspiration",
+          "description": "Bonus action: give an ally a d6 they can add to one roll in the next 10 minutes.",
+          "uses": 3,
+          "recharge": "long_rest"
+        },
+        {
+          "name": "Spellcasting (Charisma)",
+          "description": "Cantrips: Vicious Mockery (1d4 psychic, Wis save, disadvantage on next attack), Minor Illusion. 1st-level spells known: Healing Word, Charm Person, Dissonant Whispers, Faerie Fire. Save DC = 8 + Cha mod + proficiency.",
+          "recharge": "at_will"
+        }
+      ],
+      "spellSlots": [
+        2
       ]
     }
   ],
@@ -79,5 +245,149 @@
     "The duke offers a fortune to anyone who will escort his estranged daughter through the haunted Greywood before the solstice."
   ],
   "artStyle": "Painterly digital illustration in the style of a modern fantasy roleplaying sourcebook. Realistic proportions, detailed costume and gear, dramatic rim lighting, visible brushwork, rich but slightly muted colours.",
-  "theme": "parchment"
+  "theme": "parchment",
+  "slotsLabel": "Spell slots",
+  "meters": [],
+  "skillLabels": {},
+  "items": [
+    {
+      "name": "Longsword",
+      "slot": "weapon",
+      "effects": {
+        "damage": "1d8",
+        "damageStat": "str",
+        "damageType": "slashing"
+      }
+    },
+    {
+      "name": "Shortsword",
+      "slot": "weapon",
+      "effects": {
+        "damage": "1d6",
+        "damageStat": "dex",
+        "damageType": "piercing"
+      }
+    },
+    {
+      "name": "Dagger",
+      "slot": "weapon",
+      "effects": {
+        "damage": "1d4",
+        "damageStat": "dex",
+        "damageType": "piercing"
+      },
+      "notes": "Can be thrown."
+    },
+    {
+      "name": "Quarterstaff",
+      "slot": "weapon",
+      "effects": {
+        "damage": "1d6",
+        "damageStat": "str",
+        "damageType": "bludgeoning"
+      }
+    },
+    {
+      "name": "Mace",
+      "slot": "weapon",
+      "effects": {
+        "damage": "1d6",
+        "damageStat": "str",
+        "damageType": "bludgeoning"
+      }
+    },
+    {
+      "name": "Longbow",
+      "slot": "weapon",
+      "effects": {
+        "damage": "1d8",
+        "damageStat": "dex",
+        "damageType": "piercing"
+      },
+      "notes": "Range 150 ft."
+    },
+    {
+      "name": "Rapier",
+      "slot": "weapon",
+      "effects": {
+        "damage": "1d8",
+        "damageStat": "dex",
+        "damageType": "piercing"
+      }
+    },
+    {
+      "name": "Hunting knife",
+      "slot": "weapon",
+      "effects": {
+        "damage": "1d4",
+        "damageStat": "dex",
+        "damageType": "piercing"
+      }
+    },
+    {
+      "name": "Handaxe",
+      "slot": "weapon",
+      "effects": {
+        "damage": "1d6",
+        "damageStat": "str",
+        "damageType": "slashing"
+      }
+    },
+    {
+      "name": "Light crossbow",
+      "slot": "weapon",
+      "effects": {
+        "damage": "1d8",
+        "damageStat": "dex",
+        "damageType": "piercing"
+      }
+    },
+    {
+      "name": "Shield",
+      "slot": "shield",
+      "effects": {
+        "acBonus": 2
+      }
+    },
+    {
+      "name": "Leather armor",
+      "slot": "armor",
+      "effects": {
+        "acBase": 11,
+        "dexCap": null
+      }
+    },
+    {
+      "name": "Chain shirt",
+      "slot": "armor",
+      "effects": {
+        "acBase": 13,
+        "dexCap": 2
+      }
+    },
+    {
+      "name": "Scale mail",
+      "slot": "armor",
+      "effects": {
+        "acBase": 14,
+        "dexCap": 2
+      }
+    },
+    {
+      "name": "Chain mail",
+      "slot": "armor",
+      "effects": {
+        "acBase": 16,
+        "dexCap": 0
+      }
+    },
+    {
+      "name": "Plate armor",
+      "slot": "armor",
+      "effects": {
+        "acBase": 18,
+        "dexCap": 0
+      }
+    }
+  ]
 }

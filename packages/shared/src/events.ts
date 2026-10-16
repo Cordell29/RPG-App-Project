@@ -1,8 +1,10 @@
 import { z } from 'zod';
-import { CANON_KINDS, FLAG_KEY_RE, LIMITS } from './constants.ts';
+import { CANON_KINDS, FLAG_KEY_RE, LIMITS, METER_MAX, METERS, RECHARGES } from './constants.ts';
 import { AppliedDeltaSchema, StatKeySchema } from './deltas.ts';
 import { SettingPresetSchema } from './preset.ts';
 import {
+  AbilitySchema,
+  ApprovalSchema,
   CharacterSchema,
   ConditionSchema,
   FlagValueSchema,
@@ -10,7 +12,10 @@ import {
   ItemSchema,
   PlayerSchema,
   SceneSchema,
+  SkillKeySchema,
+  StatKeySchema as StatKey,
   StatsSchema,
+  UsesSchema,
 } from './state.ts';
 
 export const EVENT_TYPES = [
@@ -22,6 +27,8 @@ export const EVENT_TYPES = [
   'item_equipped',
   'chat_message',
   'action_submitted',
+  'action_edited',
+  'action_withdrawn',
   'turn_started',
   'dice_rolled',
   'delta_applied',
@@ -34,6 +41,11 @@ export const EVENT_TYPES = [
   'host_override',
   'turn_voided',
   'campaign_imported',
+  'spotlight_set',
+  'session_started',
+  'session_ended',
+  'approval_requested',
+  'approval_resolved',
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
@@ -78,6 +90,39 @@ export const HostOverrideSchema = z.discriminatedUnion('kind', [
     instanceId: IdSchema,
     patch: ItemSchema.omit({ instanceId: true }).partial(),
   }),
+  z.object({ kind: z.literal('add_ability'), characterId: IdSchema, ability: AbilitySchema }),
+  z.object({
+    kind: z.literal('update_ability'),
+    characterId: IdSchema,
+    abilityId: IdSchema,
+    // Explicit (not AbilitySchema.partial()) so recharge's default doesn't overwrite it.
+    patch: z
+      .object({
+        name: AbilitySchema.shape.name,
+        description: AbilitySchema.shape.description,
+        uses: UsesSchema,
+        recharge: z.enum(RECHARGES),
+      })
+      .partial(),
+  }),
+  z.object({ kind: z.literal('remove_ability'), characterId: IdSchema, abilityId: IdSchema }),
+  z.object({
+    kind: z.literal('spell_slots'),
+    characterId: IdSchema,
+    slots: z.array(UsesSchema.extend({ max: z.number().int().min(0).max(9) })).max(9),
+  }),
+  z.object({
+    kind: z.literal('meter'),
+    characterId: IdSchema,
+    meter: z.enum(METERS),
+    current: z.number().int().min(0).max(METER_MAX),
+  }),
+  z.object({
+    kind: z.literal('proficiencies'),
+    characterId: IdSchema,
+    skills: z.array(SkillKeySchema).max(18),
+    saves: z.array(StatKey).max(6),
+  }),
   z.object({ kind: z.literal('setting'), setting: SettingPresetSchema }),
   z.object({ kind: z.literal('scene'), scene: SceneSchema }),
   z.object({
@@ -111,6 +156,8 @@ export const PAYLOAD_SCHEMAS = {
     characterId: IdSchema.nullable(),
     text: z.string().min(1).max(LIMITS.actionLength),
   }),
+  action_edited: z.object({ actionSeq: z.number().int().positive(), text: z.string().min(1).max(LIMITS.actionLength) }),
+  action_withdrawn: z.object({ actionSeq: z.number().int().positive() }),
   turn_started: z.object({
     turnId: IdSchema,
     /** Seqs of the pending actions this turn consumes; later actions stay queued. */
@@ -138,6 +185,7 @@ export const PAYLOAD_SCHEMAS = {
     turnId: IdSchema,
     text: z.string().max(20000),
     gist: z.string().max(400).optional(),
+    suggestions: z.array(z.string().min(1).max(160)).max(3).optional(),
   }),
   scene_changed: z.object({ scene: SceneSchema }),
   image_requested: z.object({
@@ -163,6 +211,17 @@ export const PAYLOAD_SCHEMAS = {
     sourceRoomName: z.string().max(60),
     sourceExportedAt: z.string(),
     importedEventCount: z.number().int().min(0),
+  }),
+  spotlight_set: z.object({ playerId: IdSchema.nullable() }),
+  session_started: z.object({ number: z.number().int().min(1) }),
+  session_ended: z.object({ number: z.number().int().min(1) }),
+  approval_requested: z.object({ approval: ApprovalSchema }),
+  approval_resolved: z.object({
+    approvalId: IdSchema,
+    approved: z.boolean(),
+    /** The host may tweak the item or ability before approving. */
+    item: ApprovalSchema.shape.item,
+    ability: ApprovalSchema.shape.ability,
   }),
 } as const satisfies Record<EventType, z.ZodType>;
 
@@ -191,6 +250,8 @@ export const GameEventSchema = z.discriminatedUnion('type', [
   eventSchema('item_equipped'),
   eventSchema('chat_message'),
   eventSchema('action_submitted'),
+  eventSchema('action_edited'),
+  eventSchema('action_withdrawn'),
   eventSchema('turn_started'),
   eventSchema('dice_rolled'),
   eventSchema('delta_applied'),
@@ -203,6 +264,11 @@ export const GameEventSchema = z.discriminatedUnion('type', [
   eventSchema('host_override'),
   eventSchema('turn_voided'),
   eventSchema('campaign_imported'),
+  eventSchema('spotlight_set'),
+  eventSchema('session_started'),
+  eventSchema('session_ended'),
+  eventSchema('approval_requested'),
+  eventSchema('approval_resolved'),
 ]);
 export type GameEvent = z.infer<typeof GameEventSchema>;
 export type EventOf<T extends EventType> = Extract<GameEvent, { type: T }>;

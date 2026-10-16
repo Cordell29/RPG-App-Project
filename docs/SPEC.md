@@ -505,3 +505,44 @@ Stat methods (all validated on the server):
 Derived at level 1: max HP = 10 + CON modifier (min 1); AC = 10 + DEX modifier; 10 currency; level 1, 0 XP. Personal items are flavour only (no mechanical effect). The host can change anything afterwards with host overrides.
 
 **Who can change what.** Players: their own name, notes, look, and equipping/unequipping their own items. Everything else (HP, gold, stats, level, XP, AC, conditions, adding/removing items) is host override or GM tools only.
+
+### A11. Ruleset: 5e core on a d20, Starforged flavour for sci-fi (host answers 2026-10-16)
+
+**Core (both settings).** D&D 5e-style: d20 + modifier vs DC; ability modifiers; proficiency bonus by level (+2 at 1–4, +3 at 5–8, … +6 at 17–20); 18 skills; six saving throws; advantage/disadvantage; contests (A9). Internal keys stay `str dex con int wis cha` and the 18 5e skill keys; presets supply display names.
+
+**Fantasy** = classic 5e names (Strength … Charisma, Acrobatics … Survival).
+
+**Sci-fi** = Starforged-inspired names and tone on the same engine:
+| Key | Sci-fi stat | Covers |
+|---|---|---|
+| str | Iron | force, melee, endurance under load |
+| dex | Edge | speed, agility, ranged aim, piloting |
+| con | Grit | toughness; drives HP |
+| int | Wits | know-how, tech, analysis |
+| wis | Shadow | stealth, awareness, reading people |
+| cha | Heart | courage, empathy, leadership |
+Sci-fi skills are renamed where the fantasy name does not fit (e.g. Arcana → Precursor Lore, Religion → Cultures & Faiths, Nature → Xenobiology, Animal Handling → Beasts & Drones, Acrobatics → Zero-G).
+
+**Spirit and Supply (sci-fi only).** Each character has Spirit 0–5 (morale/stress) and Supply 0–5 (ammo, fuel, food), starting at 5. The GM adjusts them with `adjust_meter` (±3 max per call). At 0 the engine adds the condition *shaken* (Spirit) or *unprepared* (Supply); it is removed when the meter rises above 0. A long rest restores Spirit by 1 (Supply only through the story).
+
+**Proficiencies.** Each role lists two saving throws and a choice of skills (pick 2). Custom classes pick any 2 saves and 2 skills.
+
+**Items with real effects.** Items may carry a slot (`armor`, `shield`, `weapon`, `other`) and effects: armour base AC and Dex cap; shield/other AC bonus; weapon damage dice, damage stat (str/dex), attack bonus; stat, save or skill bonuses. Only *equipped* items apply. Flavour items have no effects. Effective AC = equipped armour (base + Dex mod up to its cap) or base AC + Dex mod, plus shield and other bonuses.
+- **Power tiers:** mundane (no bonus), uncommon (+1), rare (+2), very rare (+3). The GM may grant mundane and uncommon items on its own; rare and very rare go to the host as an **approval request** (one click approve/deny). Same for the host-only bonuses over +3: never via GM.
+- Starting kits resolve against a per-preset item catalogue (so a Longsword is 1d8 Str, Chain shirt is AC 13 + Dex max 2).
+
+**Spell slots and abilities (deferred to the GM).** The engine does not store class rules or spell lists. A character has:
+- `abilities`: name, description (up to 600 chars), optional uses (current/max) and recharge (`at_will`, `short_rest`, `long_rest`). Descriptions are free text: the GM reads and applies them; players can paste standard 5e text or **workshop** a custom ability with the AI (drafted, edited, then approved by the host; in solo, the host is the player).
+- `spellSlots`: per spell level 1–9, current/max. The GM spends them with `spend_spell_slot`; only the host changes max.
+- Roles in presets carry a few starting abilities (e.g. Fighter: Second Wind; Wizard: Spellcasting with two 1st-level slots).
+- Rests: `rest` (short/long) restores uses by recharge type; long rest also restores HP and all slots.
+
+**Engine-owned combat rolls.** `request_attack` (a character attacks with an equipped weapon vs a target AC: the server computes the attack bonus, rolls, and on a hit rolls damage) and `npc_attack` (an NPC attack bonus and damage dice vs a character's effective AC: on a hit the server applies the damage). NPC hit points are not tracked by the engine in v1; the GM narrates them.
+
+### A12. GM turn details (Phase 4)
+
+- Adjudication runs with `tool_choice: auto` plus an explicit instruction to call `end_adjudication` (current models reject forced tool choice). A text-only reply ends the round with no further deltas.
+- Narration streams over Socket.io; it ends with up to three **suggested actions** that players can click to fill their action box.
+- Round mode: actions are visible to the table and editable/withdrawable until the round resolves (`action_edited`, `action_withdrawn`). Spotlight mode: `spotlight_set` names the player who may act; it passes in seat order after each narration.
+- Sessions: host Start/End session (`session_started`, `session_ended`); the Story view groups narration by session.
+- Read aloud: browser speech in Phase 4 (per-player toggle, voice choice, ▶ on each narration).

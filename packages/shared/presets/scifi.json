@@ -1,15 +1,15 @@
 {
   "key": "scifi",
   "name": "Sci-fi",
-  "tone": "Gritty space frontier: worn ships, thin margins, corporate power and hard choices.",
+  "tone": "Gritty space frontier in the spirit of Starforged: perilous vows, worn ships, thin margins, found family and hard choices.",
   "currencyName": "credits",
   "statLabels": {
-    "str": "Might",
-    "dex": "Reflex",
+    "str": "Iron",
+    "dex": "Edge",
     "con": "Grit",
-    "int": "Tech",
-    "wis": "Insight",
-    "cha": "Presence"
+    "int": "Wits",
+    "wis": "Shadow",
+    "cha": "Heart"
   },
   "roles": [
     {
@@ -20,7 +20,35 @@
         "Armoured vest",
         "Combat knife",
         "Med-patch"
-      ]
+      ],
+      "skillChoices": [
+        "athletics",
+        "acrobatics",
+        "intimidation",
+        "perception",
+        "survival",
+        "medicine"
+      ],
+      "skillCount": 2,
+      "saves": [
+        "str",
+        "con"
+      ],
+      "abilities": [
+        {
+          "name": "Stim Rush",
+          "description": "Bonus action: regain 1d10 + your level in HP.",
+          "uses": 1,
+          "recharge": "short_rest"
+        },
+        {
+          "name": "Suppressing Fire",
+          "description": "Pin a group: until your next turn, they have disadvantage on attacks and can't advance without an Iron save.",
+          "uses": 1,
+          "recharge": "short_rest"
+        }
+      ],
+      "spellSlots": []
     },
     {
       "name": "Pilot",
@@ -30,7 +58,34 @@
         "Flight jacket",
         "Nav-slate",
         "Lucky charm"
-      ]
+      ],
+      "skillChoices": [
+        "acrobatics",
+        "perception",
+        "insight",
+        "sleight_of_hand",
+        "investigation",
+        "survival"
+      ],
+      "skillCount": 2,
+      "saves": [
+        "dex",
+        "wis"
+      ],
+      "abilities": [
+        {
+          "name": "Ace",
+          "description": "Advantage on Edge checks to pilot, chase or evade in any vehicle you know.",
+          "recharge": "at_will"
+        },
+        {
+          "name": "Hard Burn",
+          "description": "Once per day, automatically succeed on one piloting check, at the cost of strain on the ship.",
+          "uses": 1,
+          "recharge": "long_rest"
+        }
+      ],
+      "spellSlots": []
     },
     {
       "name": "Engineer",
@@ -40,6 +95,34 @@
         "Welding torch",
         "Spare power cells",
         "Diagnostic scanner"
+      ],
+      "skillChoices": [
+        "arcana",
+        "investigation",
+        "history",
+        "nature",
+        "sleight_of_hand",
+        "perception"
+      ],
+      "skillCount": 2,
+      "saves": [
+        "int",
+        "con"
+      ],
+      "abilities": [
+        {
+          "name": "Gadgeteer (Wits)",
+          "description": "Spend a tech charge to deploy a gadget: Repair Drone (restore 1d8 + Wits to a machine or ally's armour-integrated systems), Flashbang (Grit save or blinded for a round), Override (open a lock or seize a system for one minute). Save DC = 8 + Wits mod + proficiency.",
+          "recharge": "at_will"
+        },
+        {
+          "name": "Jury-Rig",
+          "description": "Patch any broken device for one scene with a Wits check; on a failure it works once and then fails badly.",
+          "recharge": "at_will"
+        }
+      ],
+      "spellSlots": [
+        2
       ]
     },
     {
@@ -50,6 +133,35 @@
         "Stim injector",
         "Stunner",
         "Bio-scanner"
+      ],
+      "skillChoices": [
+        "medicine",
+        "insight",
+        "nature",
+        "persuasion",
+        "perception",
+        "investigation"
+      ],
+      "skillCount": 2,
+      "saves": [
+        "wis",
+        "int"
+      ],
+      "abilities": [
+        {
+          "name": "Field Surgery",
+          "description": "Action: heal an adjacent ally 1d8 + Wits modifier HP.",
+          "uses": 3,
+          "recharge": "long_rest"
+        },
+        {
+          "name": "Combat Stims (Wits)",
+          "description": "Spend a tech charge: an ally gains 1d8 + Wits temporary HP and advantage on their next roll, or you neutralise a poison.",
+          "recharge": "at_will"
+        }
+      ],
+      "spellSlots": [
+        2
       ]
     },
     {
@@ -57,10 +169,39 @@
       "summary": "A recon specialist who goes first and sees everything.",
       "startingKit": [
         "Long rifle",
+        "Stealth suit",
         "Optic visor",
         "Climbing rig",
         "Survival pack"
-      ]
+      ],
+      "skillChoices": [
+        "stealth",
+        "survival",
+        "perception",
+        "athletics",
+        "nature",
+        "investigation",
+        "acrobatics"
+      ],
+      "skillCount": 3,
+      "saves": [
+        "dex",
+        "wis"
+      ],
+      "abilities": [
+        {
+          "name": "Ghost",
+          "description": "Advantage on Stealth when you move no more than half speed.",
+          "recharge": "at_will"
+        },
+        {
+          "name": "Mark Target",
+          "description": "Bonus action: for one scene, your attacks against the marked target deal an extra 1d6 damage.",
+          "uses": 1,
+          "recharge": "short_rest"
+        }
+      ],
+      "spellSlots": []
     },
     {
       "name": "Envoy",
@@ -70,7 +211,35 @@
         "Formal suit",
         "Translator earpiece",
         "Credit chit"
-      ]
+      ],
+      "skillChoices": [
+        "persuasion",
+        "deception",
+        "insight",
+        "performance",
+        "history",
+        "intimidation",
+        "religion"
+      ],
+      "skillCount": 3,
+      "saves": [
+        "wis",
+        "cha"
+      ],
+      "abilities": [
+        {
+          "name": "Silver Tongue",
+          "description": "Reroll a failed Heart check and take the second result.",
+          "uses": 2,
+          "recharge": "long_rest"
+        },
+        {
+          "name": "Contacts",
+          "description": "In any settled port you can find someone who owes you, knows you, or wants something from you.",
+          "recharge": "at_will"
+        }
+      ],
+      "spellSlots": []
     }
   ],
   "openingHooks": [
@@ -79,5 +248,138 @@
     "The colony's terraforming engine has started broadcasting a message in a language no one recognises."
   ],
   "artStyle": "Painterly science-fiction concept illustration in the style of a roleplaying sourcebook. Realistic proportions, worn practical equipment, dramatic rim lighting, visible brushwork, rich but slightly muted colours.",
-  "theme": "neon"
+  "theme": "neon",
+  "slotsLabel": "Tech charges",
+  "meters": [
+    "spirit",
+    "supply"
+  ],
+  "skillLabels": {
+    "acrobatics": "Zero-G",
+    "animal_handling": "Beasts & Drones",
+    "arcana": "Precursor Lore",
+    "nature": "Xenobiology",
+    "religion": "Cultures & Faiths",
+    "performance": "Performance",
+    "sleight_of_hand": "Sleight of Hand"
+  },
+  "items": [
+    {
+      "name": "Carbine",
+      "slot": "weapon",
+      "effects": {
+        "damage": "1d10",
+        "damageStat": "dex",
+        "damageType": "ballistic"
+      }
+    },
+    {
+      "name": "Combat knife",
+      "slot": "weapon",
+      "effects": {
+        "damage": "1d4",
+        "damageStat": "dex",
+        "damageType": "piercing"
+      }
+    },
+    {
+      "name": "Sidearm",
+      "slot": "weapon",
+      "effects": {
+        "damage": "1d8",
+        "damageStat": "dex",
+        "damageType": "ballistic"
+      }
+    },
+    {
+      "name": "Welding torch",
+      "slot": "weapon",
+      "effects": {
+        "damage": "1d6",
+        "damageStat": "dex",
+        "damageType": "fire"
+      },
+      "notes": "Cuts through hulls given time."
+    },
+    {
+      "name": "Stunner",
+      "slot": "weapon",
+      "effects": {
+        "damage": "1d6",
+        "damageStat": "dex",
+        "damageType": "shock"
+      },
+      "notes": "Can stun instead of harm."
+    },
+    {
+      "name": "Long rifle",
+      "slot": "weapon",
+      "effects": {
+        "damage": "1d10",
+        "damageStat": "dex",
+        "damageType": "ballistic"
+      },
+      "notes": "Range 600 m."
+    },
+    {
+      "name": "Holdout pistol",
+      "slot": "weapon",
+      "effects": {
+        "damage": "1d6",
+        "damageStat": "dex",
+        "damageType": "ballistic"
+      },
+      "notes": "Easy to conceal."
+    },
+    {
+      "name": "Shock baton",
+      "slot": "weapon",
+      "effects": {
+        "damage": "1d6",
+        "damageStat": "str",
+        "damageType": "shock"
+      }
+    },
+    {
+      "name": "Armoured vest",
+      "slot": "armor",
+      "effects": {
+        "acBase": 13,
+        "dexCap": 2
+      }
+    },
+    {
+      "name": "Flight jacket",
+      "slot": "armor",
+      "effects": {
+        "acBase": 11,
+        "dexCap": null
+      }
+    },
+    {
+      "name": "Stealth suit",
+      "slot": "armor",
+      "effects": {
+        "acBase": 12,
+        "dexCap": null
+      },
+      "notes": "Dampens heat and sound."
+    },
+    {
+      "name": "Hardsuit",
+      "slot": "armor",
+      "effects": {
+        "acBase": 16,
+        "dexCap": 0
+      },
+      "notes": "Vacuum rated."
+    },
+    {
+      "name": "Riot shield",
+      "slot": "shield",
+      "effects": {
+        "acBonus": 2
+      }
+    }
+  ]
 }

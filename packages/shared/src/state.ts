@@ -1,5 +1,18 @@
 import { z } from 'zod';
-import { CONDITIONS, LIMITS, MAX_LEVEL, QUEST_STATUSES, SCHEMA_VERSION } from './constants.ts';
+import {
+  CONDITIONS,
+  ITEM_SLOTS,
+  LIMITS,
+  MAX_LEVEL,
+  MAX_SPELL_LEVEL,
+  METER_MAX,
+  QUEST_STATUSES,
+  RARITIES,
+  RECHARGES,
+  SCHEMA_VERSION,
+  SKILL_KEYS,
+  STAT_KEYS,
+} from './constants.ts';
 import { SettingPresetSchema } from './preset.ts';
 
 export const IdSchema = z.string().min(1).max(LIMITS.idLength);
@@ -17,6 +30,9 @@ export type Stats = z.infer<typeof StatsSchema>;
 
 export const ConditionSchema = z.enum(CONDITIONS);
 
+export { ItemEffectsSchema, SkillKeySchema, StatKeySchema, type ItemEffects } from './schemaBits.ts';
+import { ItemEffectsSchema, SkillKeySchema, StatKeySchema } from './schemaBits.ts';
+
 export const ItemSchema = z.object({
   instanceId: IdSchema,
   name: z.string().trim().min(1).max(LIMITS.itemName),
@@ -24,8 +40,25 @@ export const ItemSchema = z.object({
   equipped: z.boolean(),
   tags: z.array(z.string().trim().min(1).max(30)).max(LIMITS.maxTags),
   notes: z.string().max(LIMITS.itemNotes).optional(),
+  slot: z.enum(ITEM_SLOTS).optional(),
+  rarity: z.enum(RARITIES).optional(),
+  effects: ItemEffectsSchema.optional(),
 });
 export type Item = z.infer<typeof ItemSchema>;
+
+export const UsesSchema = z.object({ current: z.number().int().min(0), max: z.number().int().min(1).max(99) });
+
+/** A class feature, spell list, power or gadget, as free text the GM interprets. */
+export const AbilitySchema = z.object({
+  id: IdSchema,
+  name: z.string().trim().min(1).max(80),
+  description: z.string().max(600),
+  uses: UsesSchema.optional(),
+  recharge: z.enum(RECHARGES).default('at_will'),
+});
+export type Ability = z.infer<typeof AbilitySchema>;
+
+const meter = z.object({ current: z.number().int().min(0).max(METER_MAX), max: z.number().int().min(1).max(METER_MAX) });
 
 export const CharacterSchema = z.object({
   id: IdSchema,
@@ -44,6 +77,13 @@ export const CharacterSchema = z.object({
   visualDescriptor: z.string().max(LIMITS.visualDescriptor),
   notes: z.string().max(LIMITS.characterNotes),
   portraitAssetId: IdSchema.optional(),
+  proficiencies: z
+    .object({ skills: z.array(SkillKeySchema).max(18), saves: z.array(StatKeySchema).max(6) })
+    .default({ skills: [], saves: [] }),
+  abilities: z.array(AbilitySchema).max(40).default([]),
+  /** Index 0 = 1st-level slots … index 8 = 9th. */
+  spellSlots: z.array(UsesSchema.extend({ max: z.number().int().min(0).max(9) })).max(MAX_SPELL_LEVEL).default([]),
+  meters: z.object({ spirit: meter, supply: meter }).partial().default({}),
 });
 export type Character = z.infer<typeof CharacterSchema>;
 
@@ -64,6 +104,17 @@ export const QuestSchema = z.object({
 export type Quest = z.infer<typeof QuestSchema>;
 
 export const FlagValueSchema = z.union([z.boolean(), z.number(), z.string().max(200)]);
+
+export const ApprovalSchema = z.object({
+  id: IdSchema,
+  kind: z.enum(['item', 'ability']),
+  characterId: IdSchema,
+  item: ItemSchema.optional(),
+  ability: AbilitySchema.optional(),
+  reason: z.string().max(300),
+  requestedBy: z.enum(['gm', 'player']),
+});
+export type Approval = z.infer<typeof ApprovalSchema>;
 
 export const PlayerSchema = z.object({
   id: IdSchema,
@@ -109,6 +160,10 @@ export const GameStateSchema = z.object({
   flags: z.record(z.string(), FlagValueSchema),
   turn: TurnStateSchema,
   voidedTurnIds: z.array(IdSchema),
+  pendingApprovals: z.array(ApprovalSchema),
+  /** Spotlight mode: the only player who may act; null = anyone (Round mode). */
+  spotlight: IdSchema.nullable(),
+  session: z.object({ number: z.number().int().min(0), active: z.boolean() }),
 });
 export type GameState = z.infer<typeof GameStateSchema>;
 
@@ -125,5 +180,8 @@ export function initialState(): GameState {
     flags: {},
     turn: { number: 0, phase: 'idle', turnId: null, resolving: [], pending: [] },
     voidedTurnIds: [],
+    pendingApprovals: [],
+    spotlight: null,
+    session: { number: 0, active: false },
   };
 }

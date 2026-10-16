@@ -53,7 +53,7 @@ export function randomEvents(count: number, seed: number, opts: { voids?: boolea
     const turnId = state.turn.turnId;
     const resolving = state.turn.phase === 'resolving';
     const c = party.length ? r.pick(party) : undefined;
-    const roll = r.int(0, 21);
+    const roll = r.int(0, 27);
 
     if (players.length < 2 || (players.length < 6 && roll === 0)) {
       const pid = id('p');
@@ -229,6 +229,57 @@ export function randomEvents(count: number, seed: number, opts: { voids?: boolea
         break;
       case 21:
         push('campaign_imported', { sourceRoomName: 'x', sourceExportedAt: 'y', importedEventCount: 0 });
+        break;
+      case 22: {
+        const p = state.turn.pending.length ? r.pick(state.turn.pending) : undefined;
+        if (p && r.chance(0.5)) push('action_edited', { actionSeq: p.seq, text: 'I change my mind' });
+        else if (p) push('action_withdrawn', { actionSeq: p.seq });
+        break;
+      }
+      case 23:
+        push('spotlight_set', { playerId: r.chance(0.7) ? r.pick(players).id : null });
+        break;
+      case 24:
+        if (state.session.active) push('session_ended', { number: state.session.number });
+        else push('session_started', { number: state.session.number + 1 });
+        break;
+      case 25: {
+        const pending = state.pendingApprovals;
+        if (pending.length && r.chance(0.6)) {
+          push('approval_resolved', { approvalId: r.pick(pending).id, approved: r.chance(0.6) });
+        } else {
+          const ab = { id: id('ab'), name: 'Trick', description: 'Does a trick.', uses: { current: 2, max: 2 }, recharge: 'short_rest' as const };
+          push('approval_requested', {
+            approval: r.chance(0.5)
+              ? { id: id('ap'), kind: 'ability', characterId: c!.id, ability: ab, reason: 'workshop', requestedBy: 'player' }
+              : {
+                  id: id('ap'),
+                  kind: 'item',
+                  characterId: c!.id,
+                  item: { instanceId: id('i'), name: 'Magic ring', qty: 1, equipped: false, tags: [], slot: 'other', effects: { acBonus: 2 } },
+                  reason: 'loot',
+                  requestedBy: 'gm',
+                },
+          });
+        }
+        break;
+      }
+      case 26: {
+        const withUses = c!.abilities.find((a) => a.uses && a.uses.current > 0);
+        const slotLevel = c!.spellSlots.findIndex((x) => x.current > 0);
+        if (withUses) push('delta_applied', { delta: { type: 'use_ability', characterId: c!.id, abilityId: withUses.id } }, inTurn);
+        else if (slotLevel >= 0) push('delta_applied', { delta: { type: 'spend_spell_slot', characterId: c!.id, level: slotLevel + 1 } }, inTurn);
+        else push('host_override', { override: { kind: 'spell_slots', characterId: c!.id, slots: [{ current: 2, max: 2 }] } });
+        break;
+      }
+      case 27:
+        if (c!.meters.spirit) {
+          push('delta_applied', { delta: { type: 'adjust_meter', characterId: c!.id, meter: 'spirit', amount: r.int(-3, 3) } }, inTurn);
+        } else if (r.chance(0.5)) {
+          push('host_override', { override: { kind: 'meter', characterId: c!.id, meter: 'spirit', current: 3 } });
+        } else {
+          push('delta_applied', { delta: { type: 'rest', kind: r.chance(0.5) ? 'short' : 'long', characterIds: [c!.id] } }, inTurn);
+        }
         break;
     }
   }

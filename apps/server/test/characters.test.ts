@@ -1,4 +1,4 @@
-import { type CharacterCreateInput, STAT_ROLL_NOTATION } from '@tavern/shared';
+import { type CharacterCreateInput, STAT_ROLL_NOTATION, effectiveAc } from '@tavern/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { players } from '../src/db/schema.ts';
 import { startServer } from './harness.ts';
@@ -12,6 +12,8 @@ afterEach(async () => {
 });
 
 const fighter = (over: Partial<CharacterCreateInput> = {}): CharacterCreateInput => ({
+  skills: over.roleName === 'Rogue' ? ['stealth', 'deception', 'acrobatics', 'insight'] : ['athletics', 'perception'],
+  saves: [],
   name: 'Ayla',
   ancestry: 'Human',
   className: 'Fighter',
@@ -45,7 +47,8 @@ describe('character creation', () => {
     expect(res.ok).toBe(true);
     await host.until(() => host.state.party.length === 1);
     const c = host.state.party[0]!;
-    expect(c).toMatchObject({ name: 'Ayla', class: 'Fighter', level: 1, hp: { current: 12, max: 12 }, ac: 11, gold: 10 });
+    expect(c).toMatchObject({ name: 'Ayla', class: 'Fighter', level: 1, hp: { current: 12, max: 12 }, ac: 10, gold: 10 });
+    expect(effectiveAc(c)).toBe(16); // chain shirt 13 + Dex 1 + shield 2
     expect(c.inventory.map((i) => i.name)).toContain('Longsword');
     expect(host.state.players[0]!.characterId).toBe(c.id);
     const row = s.t.rooms['db'].select().from(players).all()[0]!;

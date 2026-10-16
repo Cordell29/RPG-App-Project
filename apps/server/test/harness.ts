@@ -6,6 +6,7 @@ import {
   type GameEvent,
   type ServerToClientEvents,
   type SyncMessage,
+  type TurnStatus,
   ClientLog,
   getPreset,
 } from '@tavern/shared';
@@ -23,9 +24,9 @@ let n = 0;
 export const cid = () => `cmd-${Date.now()}-${++n}`;
 
 /** In-process server plus helpers for socket-level tests. */
-export async function startServer() {
+export async function startServer(opts: { gmTimeoutMs?: number } = {}) {
   const llm: MockLLMProvider = devMockProvider();
-  const t: TavernApp = await buildApp({ db: testDb(), llm });
+  const t: TavernApp = await buildApp({ db: testDb(), llm, ...opts });
   await t.app.listen({ port: 0, host: '127.0.0.1' });
   const url = `http://127.0.0.1:${(t.app.server.address() as AddressInfo).port}`;
   const sockets: ClientSocket[] = [];
@@ -50,6 +51,8 @@ export async function startServer() {
     readonly creds: Creds;
     syncs: SyncMessage[] = [];
     arrivals: { event: GameEvent; at: number }[] = [];
+    statuses: TurnStatus[] = [];
+    chunks: { turnId: string; delta: string }[] = [];
 
     constructor(creds: Creds) {
       this.creds = creds;
@@ -61,6 +64,8 @@ export async function startServer() {
       });
       sockets.push(this.socket);
       this.socket.on('connect', () => this.log.beginCatchUp());
+      this.socket.on('turn_status', (st) => this.statuses.push(st));
+      this.socket.on('narration_chunk', (c) => this.chunks.push(c));
       this.socket.on('sync', (msg) => {
         this.syncs.push(msg);
         this.log.applySync(msg);
@@ -76,7 +81,7 @@ export async function startServer() {
       return this.log.state;
     }
 
-    async until(pred: () => boolean, timeoutMs = 2000) {
+    async until(pred: () => boolean, timeoutMs = 3000) {
       const start = Date.now();
       while (!pred()) {
         if (Date.now() - start > timeoutMs) throw new Error('timed out waiting for condition');

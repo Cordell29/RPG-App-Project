@@ -16,7 +16,18 @@ describe('presets', () => {
 
   it('fantasy and sci-fi supply the spec labels', () => {
     expect(getPreset('fantasy')).toMatchObject({ currencyName: 'gold', statLabels: { str: 'Strength' } });
-    expect(getPreset('scifi')).toMatchObject({ currencyName: 'credits', statLabels: { int: 'Tech', cha: 'Presence' } });
+    expect(getPreset('scifi')).toMatchObject({ currencyName: 'credits', statLabels: { int: 'Wits', cha: 'Heart' }, meters: ['spirit', 'supply'] });
+  });
+
+  it('every starting-kit weapon and armour has a catalogue entry with effects', () => {
+    for (const p of BUILT_IN_PRESETS) {
+      for (const role of p.roles) {
+        expect(role.saves).toHaveLength(2);
+        expect(role.skillCount).toBeGreaterThanOrEqual(2);
+        for (const choice of role.skillChoices) expect(typeof choice).toBe('string');
+      }
+      for (const item of p.items) if (item.slot === 'weapon') expect(item.effects?.damage).toMatch(/^\d+d\d+$/);
+    }
   });
 
   it('art styles describe a look without naming a product', () => {
