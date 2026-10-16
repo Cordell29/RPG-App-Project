@@ -14,7 +14,7 @@ import { type Socket, io as connect } from 'socket.io-client';
 import { type TavernApp, buildApp } from '../src/app.ts';
 import { devMockProvider } from '../src/llm/devMock.ts';
 import type { MockLLMProvider } from '../src/llm/mock.ts';
-import { testDb } from './helpers.ts';
+import { testDb, tmpDir } from './helpers.ts';
 
 type ClientSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 type CommandBody = Command extends infer C ? (C extends Command ? Omit<C, 'commandId'> : never) : never;
@@ -26,7 +26,7 @@ export const cid = () => `cmd-${Date.now()}-${++n}`;
 /** In-process server plus helpers for socket-level tests. */
 export async function startServer(opts: { gmTimeoutMs?: number } = {}) {
   const llm: MockLLMProvider = devMockProvider();
-  const t: TavernApp = await buildApp({ db: testDb(), llm, ...opts });
+  const t: TavernApp = await buildApp({ dataDir: tmpDir(), db: testDb(), llm, ...opts });
   await t.app.listen({ port: 0, host: '127.0.0.1' });
   const url = `http://127.0.0.1:${(t.app.server.address() as AddressInfo).port}`;
   const sockets: ClientSocket[] = [];

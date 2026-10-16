@@ -204,7 +204,9 @@ export function randomEvents(count: number, seed: number, opts: { voids?: boolea
         const kind = r.pick(['portrait', 'scene', 'npc'] as const);
         const characterId = kind === 'portrait' ? c!.id : undefined;
         push('image_requested', { assetId, kind, subject: 'art', ...(characterId ? { characterId } : {}) }, inTurn);
-        push('image_ready', { assetId, kind, ...(characterId ? { characterId } : {}) });
+        if (r.chance(0.2)) push('image_failed', { assetId, reason: 'mock failure' });
+        else push('image_ready', { assetId, kind, ...(characterId ? { characterId } : {}) });
+        if (r.chance(0.2)) push('audio_ready', { assetId: id('v'), narrationSeq: state.seq });
         break;
       }
       case 18:

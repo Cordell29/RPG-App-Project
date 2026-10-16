@@ -56,7 +56,17 @@ export class Adjudicator {
   private readonly items = new Map<string, number>();
   private readonly log = { rolls: [] as string[], applied: [] as string[], rejected: [] as string[] };
 
-  constructor(opts: { state: GameState; settings: RoomSettings; turnId: string; random: RandomInt; newId: () => string }) {
+  private readonly imageQuota: { remainingToday: number; sceneAllowed: boolean };
+
+  constructor(opts: {
+    state: GameState;
+    settings: RoomSettings;
+    turnId: string;
+    random: RandomInt;
+    newId: () => string;
+    imageQuota?: { remainingToday: number; sceneAllowed: boolean };
+  }) {
+    this.imageQuota = { ...(opts.imageQuota ?? { remainingToday: 0, sceneAllowed: false }) };
     this.state = structuredClone(opts.state);
     this.settings = opts.settings;
     this.turnId = opts.turnId;
@@ -195,6 +205,16 @@ export class Adjudicator {
       case 'upsert_canon': {
         const i = input as Input<'upsert_canon'>;
         return this.applyDelta(name, raw, { type: 'upsert_canon', ...i });
+      }
+      case 'request_image': {
+        const i = input as Input<'request_image'>;
+        if (this.imageQuota.remainingToday <= 0) throw new Rejection("today's image limit for this room is used up.");
+        if (i.kind === 'scene' && !this.imageQuota.sceneAllowed) throw new Rejection('a scene image was made recently; wait a few turns.');
+        if (i.kind === 'scene') this.imageQuota.sceneAllowed = false;
+        this.imageQuota.remainingToday -= 1;
+        this.drafts.push({ type: 'image_requested', actorId: null, turnId: this.turnId, payload: { assetId: this.newId(), kind: i.kind, subject: i.subject } });
+        this.log.applied.push(`an illustration of ${i.subject} is being painted`);
+        return { ok: true, result: 'Image requested; it will appear for the players shortly.' };
       }
       case 'end_adjudication': {
         this.done = true;

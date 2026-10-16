@@ -8,6 +8,8 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': 'http://localhost:3000',
+      // Generated media (/assets/<roomId>/<file>); Vite's own bundle lives under /assets only in builds.
+      '^/assets/[^/]+/[^/]+$': 'http://localhost:3000',
       '/socket.io': { target: 'http://localhost:3000', ws: true },
     },
   },

@@ -1,4 +1,4 @@
-import type { EventOf, GameEvent, GameState } from '@tavern/shared';
+import { type CanonEntry, type EventOf, type GameEvent, type GameState, deriveCanon } from '@tavern/shared';
 
 export interface StoryTurn {
   turnId: string;
@@ -84,7 +84,7 @@ export function buildStory(events: GameEvent[], state: GameState): StoryEntry[] 
   return out;
 }
 
-/** Plain-text story for copying or printing (Phase 7 adds the Markdown export). */
+/** Plain-text story for copying or printing. */
 export function storyText(entries: StoryEntry[]): string {
   return entries
     .map((en) => {
@@ -94,4 +94,64 @@ export function storyText(entries: StoryEntry[]): string {
       return [...t.actions.map((a) => `> ${a.who}: ${a.text}`), '', t.narration?.text ?? '(no narration)', ''].join('\n');
     })
     .join('\n');
+}
+
+const KIND_HEADING: Record<CanonEntry['kind'], string> = { npc: 'People', location: 'Places', faction: 'Factions', lore: 'Lore' };
+const prettyKey = (key: string) => key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+
+/**
+ * The whole campaign record as one Markdown document: recaps, chapters and arcs,
+ * world notes, then the full story. Built in the browser from the event log.
+ */
+export function storyMarkdown(roomName: string, events: GameEvent[], state: GameState, exportedAt = new Date()): string {
+  const entries = buildStory(events, state);
+  const recaps = entries.filter((e) => e.kind === 'recap');
+  const chronicle = buildChronicle(events);
+  const canon = deriveCanon(events);
+  const out: string[] = [`# ${roomName}`, '', `_Exported ${exportedAt.toISOString().slice(0, 16).replace('T', ' ')} UTC · ${state.setting?.name ?? 'Custom setting'}_`, ''];
+
+  out.push('## Session recaps', '');
+  if (recaps.length) for (const r of recaps) out.push(`### Session ${r.number}`, '', r.text, '');
+  else out.push('_No recaps yet._', '');
+
+  out.push('## Chapters', '');
+  if (chronicle.length) for (const c of chronicle) out.push(`### ${c.level === 1 ? 'Arc' : 'Chapter'} ${c.number}`, '', c.summary, '');
+  else out.push('_Chapters are written every 10 turns._', '');
+
+  out.push('## World notes', '');
+  if (!canon.length) out.push('_Nothing recorded yet._', '');
+  for (const kind of Object.keys(KIND_HEADING) as CanonEntry['kind'][]) {
+    const list = canon.filter((c) => c.kind === kind).sort((a, b) => a.key.localeCompare(b.key));
+    if (!list.length) continue;
+    out.push(`### ${KIND_HEADING[kind]}`, '');
+    for (const c of list) {
+      out.push(`**${prettyKey(c.key)}**${c.aliases.length ? ` (${c.aliases.join(', ')})` : ''}`, '');
+      for (const f of c.facts) out.push(`- ${f}`);
+      out.push('');
+    }
+  }
+
+  out.push('## The full story', '');
+  for (const en of entries) {
+    if (en.kind === 'recap') continue;
+    if (en.kind === 'session') {
+      out.push(`### Session ${en.number} ${en.started ? 'begins' : 'ends'}`, '');
+      continue;
+    }
+    for (const a of en.turn.actions) out.push(`> **${a.who}:** ${a.text}`);
+    if (en.turn.actions.length) out.push('');
+    out.push(en.turn.narration?.text ?? '_(no narration)_', '');
+  }
+  return out.join('\n');
+}
+
+export function downloadText(filename: string, text: string, type = 'text/markdown') {
+  const url = URL.createObjectURL(new Blob([text], { type: `${type};charset=utf-8` }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

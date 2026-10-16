@@ -4,6 +4,8 @@ import { loadConfig } from './config.ts';
 import { openDb } from './db/connection.ts';
 import { AnthropicProvider } from './llm/anthropic.ts';
 import { devMockProvider } from './llm/devMock.ts';
+import { GeminiImageProvider, GeminiTtsProvider } from './media/gemini.ts';
+import { MockImageProvider, MockTtsProvider } from './media/mock.ts';
 import type { LLMProvider } from './llm/provider.ts';
 
 const config = loadConfig();
@@ -13,12 +15,25 @@ const db = openDb(config.dbFile);
 
 const llm: LLMProvider = config.anthropic ? new AnthropicProvider(config.anthropic) : devMockProvider();
 
-const { app, commands } = await buildApp({ db, llm, webDist: config.webDist, logger: true, rulesLookup: config.rulesLookup });
+const g = config.gemini;
+const images = g ? new GeminiImageProvider({ apiKey: g.apiKey, model: g.imageModel }) : new MockImageProvider();
+const tts = g ? new GeminiTtsProvider({ apiKey: g.apiKey, model: g.ttsModel, voice: g.ttsVoice }) : new MockTtsProvider();
+
+const { app, commands } = await buildApp({
+  db,
+  llm,
+  images,
+  tts,
+  dataDir: config.dataDir,
+  webDist: config.webDist,
+  logger: true,
+  rulesLookup: config.rulesLookup,
+});
 commands.pruneLog();
 setInterval(() => commands.pruneLog(), 60 * 60 * 1000).unref();
 
 await app.listen({ port: config.port, host: config.host });
-app.log.info(`Tavern listening on ${config.port} (LLM: ${llm.name})`);
+app.log.info(`Tavern listening on ${config.port} (LLM: ${llm.name}, images: ${images.name})`);
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {

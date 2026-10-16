@@ -15,7 +15,7 @@ import { type TavernApp, buildApp } from '../src/app.ts';
 import { MockLLMProvider } from '../src/llm/mock.ts';
 import { LLMError } from '../src/llm/provider.ts';
 import { mockSettingDraft } from '../src/llm/settingDraft.ts';
-import { testDb } from './helpers.ts';
+import { testDb, tmpDir } from './helpers.ts';
 
 type ClientSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
@@ -26,7 +26,7 @@ const sockets: ClientSocket[] = [];
 
 beforeEach(async () => {
   llm = new MockLLMProvider((req) => mockSettingDraft((req as { prompt: string }).prompt));
-  t = await buildApp({ db: testDb(), llm });
+  t = await buildApp({ dataDir: tmpDir(), db: testDb(), llm });
   await t.app.listen({ port: 0, host: '127.0.0.1' });
   url = `http://127.0.0.1:${(t.app.server.address() as AddressInfo).port}`;
 });

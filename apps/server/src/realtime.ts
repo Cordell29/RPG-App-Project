@@ -24,14 +24,23 @@ export type TavernIo = Server<ClientToServerEvents, ServerToClientEvents, Record
  */
 export function attachRealtime(
   httpServer: HttpServer,
-  deps: { rooms: RoomService; store: EventStore; commands: CommandBus; turnStatus: (roomId: string) => TurnStatus },
+  deps: {
+    rooms: RoomService;
+    store: EventStore;
+    commands: CommandBus;
+    turnStatus: (roomId: string) => TurnStatus;
+    /** Extra work for every committed batch (e.g. queueing media jobs). */
+    afterPublish?: (roomId: string, events: GameEvent[]) => void;
+  },
 ): TavernIo {
   const { rooms, store, commands } = deps;
   const io: TavernIo = new Server(httpServer, { serveClient: false, cors: { origin: false } });
   const online = new Map<string, Map<string, number>>(); // roomId → playerId → socket count
 
   const broadcast = (roomId: string, events: GameEvent[]) => {
-    if (events.length) io.to(roomId).emit('events', events);
+    if (!events.length) return;
+    io.to(roomId).emit('events', events);
+    deps.afterPublish?.(roomId, events);
   };
   rooms.onEvents = broadcast;
   commands.onEvents = broadcast;

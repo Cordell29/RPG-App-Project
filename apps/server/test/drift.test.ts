@@ -4,7 +4,7 @@ import { type TavernApp, buildApp } from '../src/app.ts';
 import { BUDGETS } from '../src/gm/prompt.ts';
 import { MockLLMProvider, type MockRequest } from '../src/llm/mock.ts';
 import type { ChatRequest } from '../src/llm/provider.ts';
-import { testDb } from './helpers.ts';
+import { testDb, tmpDir } from './helpers.ts';
 
 /**
  * Phase 5 acceptance: a scripted 200-turn campaign. The prompt must stay under 12,000 tokens
@@ -85,7 +85,7 @@ describe('200-turn drift test', () => {
   it('prompt stays under budget and planted facts survive to turn 200', { timeout: 120_000 }, async () => {
     let characterId = '';
     const llm = scriptedLlm(() => characterId);
-    const t: TavernApp = await buildApp({ db: testDb(), llm, rulesLookup: false });
+    const t: TavernApp = await buildApp({ dataDir: tmpDir(), db: testDb(), llm, rulesLookup: false });
     const room = t.rooms.createRoom({ roomName: 'Drift', hostName: 'Host', setting: (await import('@tavern/shared')).getPreset('fantasy')!, mode: 'solo' });
     const player = t.rooms.authenticate(room.roomId, room.token)!;
     let n = 0;

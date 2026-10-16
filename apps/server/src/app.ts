@@ -1,6 +1,7 @@
-import { existsSync } from 'node:fs';
+import { createReadStream, existsSync } from 'node:fs';
+import { join } from 'node:path';
 import fastifyStatic from '@fastify/static';
-import { BUILT_IN_PRESETS } from '@tavern/shared';
+import { BUILT_IN_PRESETS, type GameEvent } from '@tavern/shared';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { ZodError, z } from 'zod';
 import { CommandBus } from './commands.ts';
@@ -10,6 +11,9 @@ import { LLMError, type LLMProvider } from './llm/provider.ts';
 import { draftCharacter } from './llm/characterDraft.ts';
 import { draftSetting } from './llm/settingDraft.ts';
 import { TurnRunner } from './gm/turns.ts';
+import { ASSET_FILE_RE, AssetService } from './media/assets.ts';
+import { MockImageProvider, MockTtsProvider } from './media/mock.ts';
+import type { ImageProvider, TtsProvider } from './media/provider.ts';
 import { Chronicler } from './memory/chronicle.ts';
 import { draftAbility } from './llm/abilityDraft.ts';
 import { type TavernIo, attachRealtime } from './realtime.ts';
@@ -24,6 +28,10 @@ export interface AppDeps {
   rulesLookup?: boolean;
   webDist?: string | null;
   logger?: boolean;
+  images?: ImageProvider;
+  tts?: TtsProvider;
+  dataDir?: string;
+  assetBackoffMs?: (attempt: number) => number;
 }
 
 export interface TavernApp {
@@ -34,6 +42,7 @@ export interface TavernApp {
   commands: CommandBus;
   turns: TurnRunner;
   memory: Chronicler;
+  assets: AssetService;
 }
 
 export async function buildApp(deps: AppDeps): Promise<TavernApp> {
@@ -53,6 +62,18 @@ export async function buildApp(deps: AppDeps): Promise<TavernApp> {
   });
 
   app.get('/health', async () => ({ ok: true }));
+
+  // Generated art and audio. Ids are unguessable; files never change, so cache forever.
+  app.get('/assets/:roomId/:file', async (req, reply) => {
+    const { roomId, file } = req.params as { roomId: string; file: string };
+    if (!/^[A-Za-z0-9_-]{10,64}$/.test(roomId) || !ASSET_FILE_RE.test(file)) return reply.status(404).send({ error: 'Not found.' });
+    const path = join(assets.dir(roomId), file);
+    if (!existsSync(path)) return reply.status(404).send({ error: 'Not found.' });
+    return reply
+      .header('Cache-Control', 'public, max-age=31536000, immutable')
+      .type(file.endsWith('.wav') ? 'audio/wav' : 'image/webp')
+      .send(createReadStream(path));
+  });
 
   app.get('/api/presets', async () => BUILT_IN_PRESETS);
 
@@ -113,14 +134,31 @@ export async function buildApp(deps: AppDeps): Promise<TavernApp> {
 
   await app.ready();
   let io: TavernIo | null = null;
-  const memory = new Chronicler({ db: deps.db, store, llm: deps.llm, onEvents: (roomId, events) => io?.to(roomId).emit('events', events) });
+  // Every committed batch goes to the room and to the media queue.
+  const publish = (roomId: string, events: GameEvent[]) => {
+    if (!events.length) return;
+    io?.to(roomId).emit('events', events);
+    assets.onCommitted(roomId, events);
+  };
+  const assets: AssetService = new AssetService({
+    db: deps.db,
+    store,
+    dataDir: deps.dataDir ?? './data',
+    images: deps.images ?? new MockImageProvider(),
+    tts: deps.tts ?? new MockTtsProvider(),
+    settings: (roomId) => rooms.settings(rooms.requireRoom(roomId)),
+    onEvents: publish,
+    ...(deps.assetBackoffMs ? { backoffMs: deps.assetBackoffMs } : {}),
+  });
+  const memory = new Chronicler({ db: deps.db, store, llm: deps.llm, onEvents: publish });
   const turns = new TurnRunner({
     memory,
+    imageQuota: (roomId, state, events) => assets.quota(roomId, state, events),
     db: deps.db,
     store,
     rooms,
     llm: deps.llm,
-    onEvents: (roomId, events) => io?.to(roomId).emit('events', events),
+    onEvents: publish,
     emit: (roomId, name, payload) => io?.to(roomId).emit(name, payload as never),
     ...(deps.random ? { random: deps.random } : {}),
     ...(deps.gmTimeoutMs ? { timeoutMs: deps.gmTimeoutMs } : {}),
@@ -128,6 +166,15 @@ export async function buildApp(deps: AppDeps): Promise<TavernApp> {
   });
   commands.turns = turns;
   commands.memory = memory;
-  io = attachRealtime(app.server, { rooms, store, commands, turnStatus: (roomId) => turns.status(roomId) });
-  return { app, io, store, rooms, commands, turns, memory };
+  commands.media = assets;
+  io = attachRealtime(app.server, {
+    rooms,
+    store,
+    commands,
+    turnStatus: (roomId) => turns.status(roomId),
+    afterPublish: (roomId, events) => assets.onCommitted(roomId, events),
+  });
+  app.addHook('onClose', async () => assets.stop());
+  assets.start();
+  return { app, io, store, rooms, commands, turns, memory, assets };
 }

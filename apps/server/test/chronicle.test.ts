@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.ts';
 import { devMockProvider } from '../src/llm/devMock.ts';
 import { LLMError } from '../src/llm/provider.ts';
-import { testDb } from './helpers.ts';
+import { testDb, tmpDir } from './helpers.ts';
 
 const fighter: CharacterCreateInput = {
   name: 'Ayla', ancestry: '', className: 'Fighter', roleName: 'Fighter', statMethod: 'standard',
@@ -12,7 +12,7 @@ const fighter: CharacterCreateInput = {
 
 async function setup() {
   const llm = devMockProvider();
-  const t = await buildApp({ db: testDb(), llm, rulesLookup: false });
+  const t = await buildApp({ dataDir: tmpDir(), db: testDb(), llm, rulesLookup: false });
   const room = t.rooms.createRoom({ roomName: 'C', hostName: 'H', setting: getPreset('fantasy')!, mode: 'solo' });
   const player = t.rooms.authenticate(room.roomId, room.token)!;
   let n = 0;

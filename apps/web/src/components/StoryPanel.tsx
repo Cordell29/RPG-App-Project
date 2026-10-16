@@ -1,5 +1,6 @@
 import { type EventOf, LIMITS } from '@tavern/shared';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { imageUrl, useMedia, voiceUrl } from '../lib/media.ts';
 import { listVoices, speechSupported, useSpeech } from '../lib/speech.ts';
 import { type StoryTurn, buildStory, latestRecap } from '../lib/story.ts';
 import { playerName, useRoom } from '../lib/store.ts';
@@ -24,7 +25,9 @@ function RollChip({ roll }: { roll: Roll }) {
 
 export function SpeakButton({ text, seq }: { text: string; seq: number }) {
   const { speak, stop, speakingSeq } = useSpeech();
-  if (!speechSupported) return null;
+  const roomId = useRoom((s) => s.creds?.roomId ?? '');
+  const clip = useMedia().voice.get(seq);
+  if (!speechSupported && !clip) return null;
   const on = speakingSeq === seq;
   return (
     <button
@@ -32,14 +35,33 @@ export function SpeakButton({ text, seq }: { text: string; seq: number }) {
       className="btn shrink-0 px-2 py-0.5 text-xs"
       aria-label={on ? 'Stop reading' : 'Read aloud'}
       title={on ? 'Stop reading' : 'Read aloud'}
-      onClick={() => (on ? stop() : speak(text, seq))}
+      onClick={() => (on ? stop() : speak(text, seq, clip && voiceUrl(roomId, clip)))}
+      data-voice={clip ? 'ai' : 'browser'}
     >
       {on ? '■' : '▶'}
     </button>
   );
 }
 
+function Illustration({ assetId, alt, className = '' }: { assetId: string; alt: string; className?: string }) {
+  const roomId = useRoom((s) => s.creds?.roomId ?? '');
+  const status = useMedia().status.get(assetId);
+  if (status === 'ready') return <img src={imageUrl(roomId, assetId)} alt={alt} className={`w-full rounded-[var(--t-radius)] border border-line object-cover ${className}`} loading="lazy" data-testid="illustration" />;
+  if (status === 'failed')
+    return (
+      <p className="text-xs text-muted" data-testid="illustration-failed">
+        (The illustration of {alt} could not be painted.)
+      </p>
+    );
+  return (
+    <div className={`flex aspect-video w-full animate-pulse items-center justify-center rounded-[var(--t-radius)] border border-dashed border-line bg-raised text-sm text-muted ${className}`} data-testid="illustration-pending">
+      Painting {alt}…
+    </div>
+  );
+}
+
 function Turn({ turn }: { turn: StoryTurn }) {
+  const npcs = (useMedia().byTurn.get(turn.turnId) ?? []).filter((x) => x.kind === 'npc');
   return (
     <li className="space-y-2" data-testid="story-turn">
       {turn.actions.length > 0 && (
@@ -66,6 +88,12 @@ function Turn({ turn }: { turn: StoryTurn }) {
           <SpeakButton text={turn.narration.text} seq={turn.narration.seq} />
         </div>
       )}
+      {npcs.map((n) => (
+        <figure key={n.assetId} className="mx-auto max-w-56">
+          <Illustration assetId={n.assetId} alt={n.subject} className="aspect-square" />
+          <figcaption className="mt-1 text-center text-xs text-muted">{n.subject}</figcaption>
+        </figure>
+      ))}
     </li>
   );
 }
@@ -123,6 +151,8 @@ function Countdown({ deadline }: { deadline: number }) {
 
 function HostTurnControls() {
   const { send, state, settings, turnStatus } = useRoom();
+  const media = useMedia();
+  const scenePainting = !!media.latestScene && media.status.get(media.latestScene) === 'pending';
   const [error, setError] = useState<string | null>(null);
   const run = async (body: Parameters<typeof send>[0]) => {
     setError(null);
@@ -153,6 +183,13 @@ function HostTurnControls() {
             Write recap
           </button>
         )}
+        <button type="button" className="btn py-1 text-sm" disabled={scenePainting} onClick={() => run({ type: 'request_image', kind: 'scene' })}>
+          {scenePainting ? 'Painting scene…' : 'Illustrate scene'}
+        </button>
+        <label className="flex items-center gap-1" title="The server records narration with an AI voice (small cost per clip). Players still choose whether to listen.">
+          <input type="checkbox" checked={!!settings?.aiVoice} onChange={(e) => run({ type: 'set_ai_voice', on: e.target.checked })} />
+          AI voice
+        </label>
         {settings?.mode === 'group' && (
           <label className="flex items-center gap-1">
             <span className="sr-only">Turn mode</span>
@@ -332,7 +369,9 @@ function ActionComposer({ prefill, onPrefillUsed }: { prefill: string | null; on
 
 /** The story: turns, rolls, narration (streamed live), suggestions and the action box. */
 export function StoryPanel() {
-  const { state, events, streaming, turnStatus, isHost, liveNarrationSeq } = useRoom();
+  const { state, events, streaming, turnStatus, isHost, liveNarrationSeq, settings, creds } = useRoom();
+  const media = useMedia();
+  const spokenRef = useRef<number | null>(null);
   const autoRead = useSpeech((s) => s.autoRead);
   const speak = useSpeech((s) => s.speak);
   const [prefill, setPrefill] = useState<string | null>(null);
@@ -350,12 +389,24 @@ export function StoryPanel() {
     endRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }, [entries.length, streaming?.text.length]);
 
-  // Auto read-aloud: only narration that arrived live, never history on load.
+  // Auto read-aloud: only narration that arrived live, never history on load. With AI voice
+  // on, wait (up to 20 s) for the recorded clip, then fall back to the browser voice.
+  const liveClip = liveNarrationSeq !== null ? media.voice.get(liveNarrationSeq) : undefined;
   useEffect(() => {
-    if (!autoRead || liveNarrationSeq === null) return;
+    if (!autoRead || liveNarrationSeq === null || spokenRef.current === liveNarrationSeq) return;
     const e = events.find((x) => x.seq === liveNarrationSeq);
-    if (e?.type === 'narration') speak(e.payload.text, e.seq);
-  }, [liveNarrationSeq, autoRead, events, speak]);
+    if (e?.type !== 'narration') return;
+    const go = (clip?: string) => {
+      spokenRef.current = e.seq;
+      speak(e.payload.text, e.seq, clip && creds ? voiceUrl(creds.roomId, clip) : undefined);
+    };
+    if (liveClip || !settings?.aiVoice) return go(liveClip);
+    const t = setTimeout(() => go(), 20_000);
+    return () => clearTimeout(t);
+  }, [liveNarrationSeq, liveClip, autoRead, events, speak, settings?.aiVoice, creds]);
+
+  const sceneId = state.scene.imageAssetId;
+  const scenePending = media.latestScene && media.status.get(media.latestScene) === 'pending' ? media.latestScene : null;
 
   return (
     <section className="panel flex flex-col gap-3 p-5" aria-labelledby="story-h">
@@ -377,6 +428,16 @@ export function StoryPanel() {
       )}
       {isHost && <HostTurnControls />}
       {isHost && <ApprovalQueue />}
+
+      {(sceneId || scenePending) && (
+        <figure data-testid="scene-image">
+          {sceneId && !scenePending ? (
+            <Illustration assetId={sceneId} alt={state.scene.title || 'the scene'} className="aspect-video max-h-72" />
+          ) : (
+            <Illustration assetId={scenePending!} alt={state.scene.title || 'the scene'} className="max-h-72" />
+          )}
+        </figure>
+      )}
 
       {recap && (
         <aside className="rounded-[var(--t-radius)] border border-accent bg-raised p-3" aria-label="Recap" data-testid="recap">

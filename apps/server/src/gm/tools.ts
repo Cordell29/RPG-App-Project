@@ -102,6 +102,7 @@ export const TOOL_INPUTS = {
     aliases: z.array(z.string().min(1).max(80)).max(10).default([]),
     facts: z.array(z.string().min(1).max(300)).max(20),
   }),
+  request_image: z.object({ kind: z.enum(['scene', 'npc']), subject: z.string().min(1).max(300) }),
   end_adjudication: z.object({ summary: z.string().max(300) }),
 } as const;
 
@@ -133,6 +134,8 @@ const DESCRIPTIONS: Record<ToolName, string> = {
   update_quest: 'Create or update a quest; add a note to record progress, debts and promises.',
   change_scene: 'Move the party to a new location (description up to 600 characters).',
   upsert_canon: 'Record or update a lasting fact about an NPC, location, faction or lore.',
+  request_image:
+    'Ask for an illustration: a scene (a new or dramatic location; at most one every few turns) or an NPC portrait the first time an important character appears. The subject should be visual (who or what, mood, lighting). Images arrive later; never wait for them.',
   end_adjudication: 'Finish resolving this turn. Always call this last, with a one-line summary.',
 };
 

@@ -75,6 +75,13 @@ export const CommandSchema = z.discriminatedUnion('type', [
   z.object({ commandId, type: z.literal('write_recap') }),
   z.object({
     commandId,
+    type: z.literal('request_image'),
+    kind: z.enum(['scene', 'portrait']),
+    characterId: z.string().min(1).max(64).optional(),
+  }),
+  z.object({ commandId, type: z.literal('set_ai_voice'), on: z.boolean() }),
+  z.object({
+    commandId,
     type: z.literal('resolve_approval'),
     approvalId: z.string().min(1).max(64),
     approved: z.boolean(),
@@ -114,6 +121,7 @@ export const HOST_COMMANDS: readonly CommandType[] = [
   'start_session',
   'end_session',
   'write_recap',
+  'set_ai_voice',
   'resolve_approval',
 ];
 

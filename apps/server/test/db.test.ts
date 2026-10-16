@@ -28,7 +28,7 @@ describe('migrations', () => {
 
   it('is idempotent', () => {
     const sqlite = new Database(':memory:');
-    expect(migrate(sqlite)).toEqual([1, 2]);
+    expect(migrate(sqlite)).toEqual([1, 2, 3]);
     expect(migrate(sqlite)).toEqual([]);
   });
 
@@ -37,7 +37,7 @@ describe('migrations', () => {
     const broken = [...loadMigrations(), { version: 98, name: '0098_broken.sql', sql: 'CREATE TABLE x (a); SELEKT;' }];
     expect(() => migrate(sqlite, broken)).toThrow(MigrationError);
     const versions = sqlite.prepare('SELECT version FROM schema_migrations').all();
-    expect(versions).toEqual([{ version: 1 }, { version: 2 }]);
+    expect(versions).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }]);
     expect(sqlite.prepare("SELECT name FROM sqlite_master WHERE name = 'x'").get()).toBeUndefined();
   });
 

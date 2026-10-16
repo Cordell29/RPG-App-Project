@@ -17,6 +17,7 @@ import {
   statModifier,
 } from '@tavern/shared';
 import { effectText } from '../lib/items.ts';
+import { imageUrl, useMedia } from '../lib/media.ts';
 import { AbilityWorkshop } from './AbilityWorkshop.tsx';
 import { useState } from 'react';
 import { useRoom } from '../lib/store.ts';
@@ -48,19 +49,67 @@ function Bar({ value, max, tone, label }: { value: number; max: number; tone: 'h
 }
 
 export function Portrait({ character, size = 56 }: { character: Character; size?: number }) {
+  const roomId = useRoom((s) => s.creds?.roomId ?? '');
+  const media = useMedia();
   const initials = character.name
     .split(/\s+/)
     .map((w) => w[0])
     .join('')
     .slice(0, 2)
     .toUpperCase();
+  const requested = media.portraitRequest.get(character.id);
+  const status = requested ? media.status.get(requested) : undefined;
+  const painting = status === 'pending';
+  const failed = status === 'failed' && !character.portraitAssetId;
+  const id = character.portraitAssetId;
   return (
     <div
-      className="flex shrink-0 items-center justify-center rounded-[var(--t-radius)] border-2 border-line bg-raised heading font-bold text-muted"
+      className="relative flex shrink-0 items-center justify-center overflow-hidden rounded-[var(--t-radius)] border-2 border-line bg-raised heading font-bold text-muted"
       style={{ width: size, height: size, fontSize: size * 0.38 }}
-      aria-hidden="true"
+      title={failed ? 'The portrait could not be painted' : painting ? 'Painting a portrait…' : undefined}
+      data-testid="portrait"
+      data-state={id ? 'ready' : painting ? 'painting' : failed ? 'failed' : 'none'}
     >
-      {initials}
+      {id ? <img src={imageUrl(roomId, id)} alt={`Portrait of ${character.name}`} className="h-full w-full object-cover" loading="lazy" /> : <span aria-hidden="true">{initials}</span>}
+      {painting && (
+        <span className="absolute inset-0 flex animate-pulse items-center justify-center bg-black/45 text-[10px] font-normal text-white" style={{ fontSize: Math.max(9, size * 0.16) }}>
+          painting…
+        </span>
+      )}
+      {failed && (
+        <span className="absolute bottom-0 right-0 rounded-tl bg-bad px-1 text-[9px] font-normal text-white" aria-label="portrait failed">
+          !
+        </span>
+      )}
+    </div>
+  );
+}
+
+function NewPortraitButton({ character }: { character: Character }) {
+  const send = useRoom((s) => s.send);
+  const media = useMedia();
+  const [error, setError] = useState<string | null>(null);
+  const requested = media.portraitRequest.get(character.id);
+  const busy = !!requested && media.status.get(requested) === 'pending';
+  return (
+    <div className="text-right">
+      <button
+        type="button"
+        className="btn px-2 py-0.5 text-xs"
+        disabled={busy}
+        onClick={async () => {
+          setError(null);
+          const res = await send({ type: 'request_image', kind: 'portrait', characterId: character.id });
+          if (!res.ok) setError(res.error);
+        }}
+      >
+        {busy ? 'Painting…' : 'New portrait'}
+      </button>
+      {error && (
+        <p className="mt-1 max-w-48 text-xs text-bad" role="alert">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
@@ -107,7 +156,7 @@ export function CharacterSheet({ character: c, setting, canEdit }: { character: 
   return (
     <article className="space-y-4" aria-label={`Character sheet: ${c.name}`} data-testid="character-sheet">
       <header className="flex items-center gap-3">
-        <Portrait character={c} />
+        <Portrait character={c} size={72} />
         <div className="min-w-0 flex-1">
           <h3 className="heading truncate text-xl font-bold" data-testid="sheet-name">
             {c.name}
@@ -116,6 +165,7 @@ export function CharacterSheet({ character: c, setting, canEdit }: { character: 
             {[c.ancestry, c.class].filter(Boolean).join(' ')} · Level {c.level}
           </p>
         </div>
+        {canEdit && <NewPortraitButton character={c} />}
         {isHost && (
           <button type="button" className={`btn py-1 text-sm ${hostOpen ? 'btn-primary' : ''}`} aria-expanded={hostOpen} onClick={() => setHostOpen((o) => !o)}>
             Host edit

@@ -4,6 +4,7 @@ import {
   type CommandResult,
   type EventDraft,
   type GameEvent,
+  type GameState,
   type RandomInt,
   type RoomSettings,
   CommandSchema,
@@ -38,6 +39,11 @@ export interface TurnHooks {
   status(roomId: string): { status: string };
 }
 
+export interface MediaHooks {
+  quota(roomId: string, state: GameState, events: GameEvent[]): { remainingToday: number; sceneAllowed: boolean };
+  portraitsThisSession(events: GameEvent[], characterId: string): number;
+}
+
 export interface MemoryHooks {
   recap(roomId: string, sessionNumber: number): void;
   syncCanon(roomId: string): void;
@@ -62,6 +68,7 @@ export class CommandBus {
   /** GM turn control, wired by the app once the TurnRunner exists. */
   turns: TurnHooks | null = null;
   memory: MemoryHooks | null = null;
+  media: MediaHooks | null = null;
 
   constructor(db: Db, store: EventStore, random: RandomInt = randomInt) {
     this.db = db;
@@ -99,6 +106,8 @@ export class CommandBus {
       try {
         if (cmd.type === 'set_room_mode') {
           newSettings = this.setMode(player.roomId, { mode: cmd.mode });
+        } else if (cmd.type === 'set_ai_voice') {
+          newSettings = this.setMode(player.roomId, { aiVoice: cmd.on });
         } else if (cmd.type === 'set_turn_mode') {
           newSettings = this.setMode(player.roomId, {
             turnMode: cmd.turnMode,
@@ -144,7 +153,7 @@ export class CommandBus {
 
   private after: (() => void)[] = [];
 
-  private setMode(roomId: string, patch: Partial<Pick<RoomSettings, 'mode' | 'turnMode' | 'turnWindowSeconds'>>): RoomSettings {
+  private setMode(roomId: string, patch: Partial<Pick<RoomSettings, 'mode' | 'turnMode' | 'turnWindowSeconds' | 'aiVoice'>>): RoomSettings {
     const row = this.db.select().from(rooms).where(eq(rooms.id, roomId)).get();
     if (!row) throw new CommandRejected('Room not found.');
     const current = RoomSettingsSchema.parse(JSON.parse(row.settingsJson));
@@ -157,7 +166,7 @@ export class CommandBus {
     return next;
   }
 
-  private toEvents(player: AuthedPlayer, cmd: Exclude<Command, { type: 'set_room_mode' | 'set_turn_mode' }>): EventDraft[] {
+  private toEvents(player: AuthedPlayer, cmd: Exclude<Command, { type: 'set_room_mode' | 'set_turn_mode' | 'set_ai_voice' }>): EventDraft[] {
     const base = { actorId: player.playerId, turnId: null };
     const state = this.store.getState(player.roomId);
     const me = state.players.find((p) => p.id === player.playerId);
@@ -201,7 +210,11 @@ export class CommandBus {
           newItemId: newId,
         });
         this.db.update(players).set({ characterId: character.id }).where(eq(players.id, player.playerId)).run();
-        return [{ ...base, type: 'character_created', payload: { character } }];
+        const drafts: EventDraft[] = [{ ...base, type: 'character_created', payload: { character } }];
+        if (this.media && this.media.quota(player.roomId, state, []).remainingToday > 0) {
+          drafts.push({ ...base, type: 'image_requested', payload: { assetId: newId(), kind: 'portrait', subject: character.name, characterId: character.id } });
+        }
+        return drafts;
       }
 
       case 'edit_character': {
@@ -322,6 +335,19 @@ export class CommandBus {
             payload: { approval: { id: newId(), kind: 'ability', characterId: c.id, ability, reason: cmd.basis || 'Workshopped by the player', requestedBy: 'player' } },
           },
         ];
+      }
+
+      case 'request_image': {
+        if (!this.media) reject('Images are not available.');
+        const events = this.store.loadEvents(player.roomId);
+        if (this.media!.quota(player.roomId, state, events).remainingToday <= 0) reject("Today's image limit for this room is used up.");
+        if (cmd.kind === 'scene') {
+          if (!player.isHost) reject('Only the host can do that.');
+          return [{ ...base, type: 'image_requested', payload: { assetId: newId(), kind: 'scene', subject: state.scene.title || state.scene.locationKey } }];
+        }
+        const c = ownCharacter(cmd.characterId ?? state.party.find((x) => x.playerId === player.playerId)?.id ?? reject('No character.'));
+        if (!player.isHost && this.media!.portraitsThisSession(events, c.id) >= 1) reject('One new portrait per character per session.');
+        return [{ ...base, type: 'image_requested', payload: { assetId: newId(), kind: 'portrait', subject: c.name, characterId: c.id } }];
       }
 
       case 'host_override':

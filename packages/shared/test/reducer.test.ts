@@ -725,6 +725,20 @@ forType('session_recap', () => {
   });
 });
 
+forType('image_failed', () => {
+  it('changes nothing but seq', () => {
+    const { before, after } = step(seededLog(), (l) => l.push('image_failed', { assetId: 'a1', reason: 'quota' }));
+    expectOnlySeqChanged(before, after);
+  });
+});
+
+forType('audio_ready', () => {
+  it('changes nothing but seq', () => {
+    const { before, after } = step(seededLog(), (l) => l.push('audio_ready', { assetId: 'v1', narrationSeq: 3 }));
+    expectOnlySeqChanged(before, after);
+  });
+});
+
 forType('campaign_imported', () => {
   it('changes nothing but seq', () => {
     const { before, after } = step(seededLog(), (l) =>

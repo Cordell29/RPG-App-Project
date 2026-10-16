@@ -198,6 +198,8 @@ export function apply(state: GameState, event: GameEvent, options: ApplyOptions 
     case 'image_requested':
     case 'chapter_closed':
     case 'session_recap':
+    case 'image_failed':
+    case 'audio_ready':
     case 'campaign_imported':
       break;
 

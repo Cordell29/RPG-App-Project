@@ -1,6 +1,13 @@
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { EventDraft, GameEvent } from '@tavern/shared';
 import { type Db, openDb } from '../src/db/connection.ts';
 import { rooms } from '../src/db/schema.ts';
+
+export function tmpDir(): string {
+  return mkdtempSync(join(tmpdir(), 'tavern-test-'));
+}
 
 export function testDb(file = ':memory:'): Db {
   return openDb(file);

@@ -1,6 +1,6 @@
 import { type CanonEntry, deriveCanon } from '@tavern/shared';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { type StoryEntry, buildChronicle, storyText } from '../lib/story.ts';
+import { type StoryEntry, buildChronicle, downloadText, storyMarkdown, storyText } from '../lib/story.ts';
 import { useRoom } from '../lib/store.ts';
 import { CopyButton } from './CopyButton.tsx';
 import { SpeakButton } from './StoryPanel.tsx';
@@ -59,6 +59,11 @@ function WorldNotes() {
 
 export function StoryReader({ entries, onClose }: { entries: StoryEntry[]; onClose: () => void }) {
   const roomName = useRoom((s) => s.state.roomName);
+  const download = () => {
+    const { events, state } = useRoom.getState();
+    const slug = roomName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'tavern';
+    downloadText(`${slug}-story.md`, storyMarkdown(roomName, events, state));
+  };
   const ref = useRef<HTMLDialogElement>(null);
   const [tab, setTab] = useState<'story' | 'chronicle' | 'world'>('story');
   useEffect(() => {
@@ -78,6 +83,9 @@ export function StoryReader({ entries, onClose }: { entries: StoryEntry[]; onClo
             {roomName}: the story so far
           </h2>
           <CopyButton text={storyText(entries)} label="Copy text" />
+          <button type="button" className="btn py-1 text-sm" onClick={download} title="Recaps, chapters, world notes and the full story as a Markdown file">
+            Download
+          </button>
           <button type="button" className="btn py-1 text-sm" onClick={() => ref.current?.close()}>
             Close
           </button>

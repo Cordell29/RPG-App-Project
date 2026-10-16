@@ -116,15 +116,16 @@ export const assets = sqliteTable(
     roomId: text('room_id')
       .notNull()
       .references(() => rooms.id),
-    kind: text('kind', { enum: ['portrait', 'scene', 'npc'] }).notNull(),
+    kind: text('kind', { enum: ['portrait', 'scene', 'npc', 'voice'] }).notNull(),
     prompt: text('prompt').notNull(),
     status: text('status', { enum: ['pending', 'ready', 'failed'] }).notNull(),
     path: text('path'),
     attempts: integer('attempts').notNull().default(0),
     error: text('error'),
+    costCents: integer('cost_cents').notNull().default(0),
     createdAt: text('created_at').notNull(),
   },
-  (t) => [index('assets_status_idx').on(t.status)],
+  (t) => [index('assets_status_idx').on(t.status), index('assets_room_idx').on(t.roomId, t.createdAt)],
 );
 
 export const commandLog = sqliteTable(

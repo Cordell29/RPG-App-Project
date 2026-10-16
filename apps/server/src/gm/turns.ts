@@ -47,6 +47,8 @@ export interface TurnRunnerDeps {
   rulesLookup?: boolean;
   /** Long-term memory: chronicle, canon and recaps. */
   memory?: Chronicler;
+  /** What illustrations the GM may request this turn. */
+  imageQuota?: (roomId: string, state: GameState, events: GameEvent[]) => { remainingToday: number; sceneAllowed: boolean };
 }
 
 /**
@@ -58,8 +60,9 @@ export interface TurnRunnerDeps {
  * commit leaves nothing behind; actions stay queued and the host can retry.
  */
 export class TurnRunner {
-  private readonly d: Required<Omit<TurnRunnerDeps, 'random' | 'newId' | 'timeoutMs' | 'rulesLookup' | 'memory'>> & {
+  private readonly d: Required<Omit<TurnRunnerDeps, 'random' | 'newId' | 'timeoutMs' | 'rulesLookup' | 'memory' | 'imageQuota'>> & {
     memory: Chronicler | null;
+    imageQuota: TurnRunnerDeps['imageQuota'] | null;
     random: RandomInt;
     newId: () => string;
     timeoutMs: number;
@@ -76,7 +79,7 @@ export class TurnRunner {
   readonly lastBudget = new Map<string, BudgetReport>();
 
   constructor(deps: TurnRunnerDeps) {
-    this.d = { random: randomInt, newId: defaultNewId, timeoutMs: 60_000, rulesLookup: true, memory: null, ...deps };
+    this.d = { random: randomInt, newId: defaultNewId, timeoutMs: 60_000, rulesLookup: true, memory: null, imageQuota: null, ...deps };
   }
 
   status(roomId: string): TurnStatus {
@@ -229,7 +232,8 @@ export class TurnRunner {
     const usage: Usage = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 };
     let adj: Adjudicator;
     try {
-      adj = new Adjudicator({ state, settings, turnId, random: this.d.random, newId: this.d.newId });
+      const imageQuota = this.d.imageQuota?.(roomId, state, this.d.store.loadEvents(roomId));
+      adj = new Adjudicator({ state, settings, turnId, random: this.d.random, newId: this.d.newId, ...(imageQuota ? { imageQuota } : {}) });
       const prompt = buildTurnPrompt({
         state,
         recent: this.recentTurns(roomId, state),
