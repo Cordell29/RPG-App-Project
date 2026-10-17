@@ -1,3 +1,4 @@
+import { randomId } from './id.ts';
 import {
   type ClientToServerEvents,
   type Command,
@@ -174,7 +175,7 @@ export const useRoom = create<RoomStore>((set, get) => {
      * commandId's result, so a retry after a lost ack can never apply the command twice.
      */
     async send(body) {
-      const cmd = { ...body, commandId: crypto.randomUUID() } as Command;
+      const cmd = { ...body, commandId: randomId() } as Command;
       for (let attempt = 1; ; attempt++) {
         const s = socket;
         if (!s) return { ok: false, error: 'Not connected.' };

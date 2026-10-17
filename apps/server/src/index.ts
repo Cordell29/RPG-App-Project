@@ -1,4 +1,5 @@
 import { mkdirSync } from 'node:fs';
+import { networkInterfaces } from 'node:os';
 import { buildApp } from './app.ts';
 import { NightlyBackups } from './backup/nightly.ts';
 import { loadConfig } from './config.ts';
@@ -57,6 +58,12 @@ backups.start();
 
 await app.listen({ port: config.port, host: config.host });
 app.log.info(`Tavern listening on ${config.port} (LLM: ${llm.name}, images: ${images.name})`);
+// Handy for testing on a phone on the same Wi-Fi.
+if (config.host === '0.0.0.0') {
+  for (const addrs of Object.values(networkInterfaces())) {
+    for (const a of addrs ?? []) if (a.family === 'IPv4' && !a.internal) console.log(`[tavern] On your Wi-Fi, open http://${a.address}:${config.port}`);
+  }
+}
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {

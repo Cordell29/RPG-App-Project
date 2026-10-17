@@ -1,3 +1,4 @@
+import { randomId } from '../lib/id.ts';
 import { type Character, type HostOverride, type SettingPreset, CONDITIONS, LIMITS, STAT_KEYS } from '@tavern/shared';
 import { useState } from 'react';
 import { useRoom } from '../lib/store.ts';
@@ -144,7 +145,7 @@ export function HostControls({ character: c, setting }: { character: Character; 
                 kind: 'add_item',
                 characterId: c.id,
                 item: {
-                  instanceId: crypto.randomUUID().slice(0, 16),
+                  instanceId: randomId().slice(0, 16),
                   name: item.name.trim(),
                   qty: item.qty,
                   equipped: false,
