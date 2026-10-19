@@ -49,6 +49,8 @@ export interface TurnRunnerDeps {
   memory?: Chronicler;
   /** Spend caps: may a new GM turn start in this room? */
   gate?: (roomId: string) => { ok: true } | { ok: false; message: string };
+  /** False hides the GM's request_image tool (pictures switched off). */
+  imagesEnabled?: boolean;
   /** At most this many GM turns per room per minute (default 6). */
   turnsPerMinute?: number;
   /** What illustrations the GM may request this turn. */
@@ -64,7 +66,8 @@ export interface TurnRunnerDeps {
  * commit leaves nothing behind; actions stay queued and the host can retry.
  */
 export class TurnRunner {
-  private readonly d: Required<Omit<TurnRunnerDeps, 'random' | 'newId' | 'timeoutMs' | 'rulesLookup' | 'memory' | 'imageQuota' | 'gate' | 'turnsPerMinute'>> & {
+  private readonly d: Required<Omit<TurnRunnerDeps, 'random' | 'newId' | 'timeoutMs' | 'rulesLookup' | 'memory' | 'imageQuota' | 'gate' | 'turnsPerMinute' | 'imagesEnabled'>> & {
+    imagesEnabled: boolean;
     gate: TurnRunnerDeps['gate'] | null;
     turnsPerMinute: number;
     memory: Chronicler | null;
@@ -87,7 +90,7 @@ export class TurnRunner {
   readonly lastBudget = new Map<string, BudgetReport>();
 
   constructor(deps: TurnRunnerDeps) {
-    this.d = { random: randomInt, newId: defaultNewId, timeoutMs: 60_000, rulesLookup: true, memory: null, imageQuota: null, gate: null, turnsPerMinute: 6, ...deps };
+    this.d = { random: randomInt, newId: defaultNewId, timeoutMs: 60_000, rulesLookup: true, memory: null, imageQuota: null, gate: null, turnsPerMinute: 6, imagesEnabled: true, ...deps };
   }
 
   status(roomId: string): TurnStatus {
@@ -282,7 +285,7 @@ export class TurnRunner {
         ...(this.d.memory ? { chronicle: this.d.memory.chronicle(roomId), canon: this.d.memory.canon(roomId) } : {}),
       });
       this.lastBudget.set(roomId, prompt.budget);
-      const tools = toolSpecs();
+      const tools = toolSpecs().filter((t) => this.d.imagesEnabled || t.name !== 'request_image');
       const messages: LlmMessage[] = [{ role: 'user', content: prompt.user }];
       for (let round = 0; round < MAX_ADJUDICATION_ROUNDS && !adj.done; round++) {
         const resp = await this.withTimeout((signal) =>

@@ -44,6 +44,8 @@ interface RoomStore {
   publicUrl: string | null;
   /** Host only: returning players waiting to be let back in. */
   rejoinRequests: RejoinRequestInfo[];
+  /** Server features (pictures can be switched off). */
+  features: { images: boolean };
   connect: (creds: Credentials) => void;
   disconnect: () => void;
   send: (cmd: CommandBody) => Promise<CommandResult>;
@@ -78,6 +80,7 @@ export const useRoom = create<RoomStore>((set, get) => {
     liveNarrationSeq: null,
     publicUrl: null,
     rejoinRequests: [],
+    features: { images: true },
 
     connect(creds) {
       if (socket && get().creds?.token === creds.token) return;
@@ -111,6 +114,7 @@ export const useRoom = create<RoomStore>((set, get) => {
           turnStatus: msg.turnStatus,
           publicUrl: msg.publicUrl ?? null,
           rejoinRequests: msg.rejoinRequests ?? [],
+          features: msg.features ?? { images: true },
         });
         publish();
         if (gap !== null) resync(gap);

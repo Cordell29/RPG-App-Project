@@ -43,6 +43,7 @@ export interface TurnHooks {
 export interface MediaHooks {
   quota(roomId: string, state: GameState, events: GameEvent[]): { remainingToday: number; sceneAllowed: boolean };
   portraitsThisSession(events: GameEvent[], characterId: string): number;
+  readonly imagesEnabled: boolean;
   /** Null if the room may spend on images now, else why not. */
   budgetBlock(roomId: string): string | null;
   /** Re-queues images whose files are missing; returns how many. */
@@ -388,6 +389,7 @@ export class CommandBus {
 
       case 'request_image': {
         if (!this.media) reject('Images are not available.');
+        if (!this.media!.imagesEnabled) reject('Pictures are switched off on this server (IMAGES=off in .env).');
         const events = this.store.loadEvents(player.roomId);
         if (this.media!.quota(player.roomId, state, events).remainingToday <= 0) reject("Today's image limit for this room is used up.");
         const blocked = this.media!.budgetBlock(player.roomId);

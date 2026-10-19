@@ -34,6 +34,8 @@ export interface AssetServiceDeps {
   onEvents: (roomId: string, events: GameEvent[]) => void;
   /** Spend caps: checked before each generation; costs are recorded here. */
   spend?: { check(roomId: string): { ok: true } | { ok: false; message: string }; record(roomId: string, category: string, usd: number): void } | null;
+  /** False when pictures are switched off (IMAGES=off, e.g. a free Gemini key). */
+  imagesEnabled?: boolean;
   /** Delay before retry n (1-based). Tests pass () => 0. */
   backoffMs?: (attempt: number) => number;
   timeoutMs?: number;
@@ -70,7 +72,7 @@ export class AssetService {
   private readonly controllers = new Set<AbortController>();
 
   constructor(deps: AssetServiceDeps) {
-    this.d = { backoffMs: (n) => 1000 * 4 ** (n - 1), timeoutMs: 90_000, spend: null, ...deps };
+    this.d = { backoffMs: (n) => 1000 * 4 ** (n - 1), timeoutMs: 90_000, spend: null, imagesEnabled: true, ...deps };
   }
 
   dir(roomId: string) {
@@ -108,7 +110,7 @@ export class AssetService {
   /** What the GM may request this turn. */
   quota(roomId: string, state: GameState, events: GameEvent[]) {
     const settings = this.d.settings(roomId);
-    const remainingToday = Math.max(0, settings.imagesPerDay - this.imagesToday(roomId));
+    const remainingToday = this.d.imagesEnabled ? Math.max(0, settings.imagesPerDay - this.imagesToday(roomId)) : 0;
     let lastSceneTurn = -Infinity;
     let turnNo = 0;
     const voided = new Set(state.voidedTurnIds);
@@ -179,6 +181,10 @@ export class AssetService {
   }
 
   // ── the worker ──────────────────────────────────────────────────────────
+
+  get imagesEnabled(): boolean {
+    return this.d.imagesEnabled;
+  }
 
   /** Null if the room may spend on media now, else the reason it may not. */
   budgetBlock(roomId: string): string | null {

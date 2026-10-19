@@ -29,7 +29,7 @@ function pickLlm(): LLMProvider {
 }
 const llm = pickLlm();
 
-const images = g ? new GeminiImageProvider({ apiKey: g.apiKey, model: g.imageModel }) : new MockImageProvider();
+const images = g && config.images ? new GeminiImageProvider({ apiKey: g.apiKey, model: g.imageModel }) : new MockImageProvider();
 const tts = g ? new GeminiTtsProvider({ apiKey: g.apiKey, model: g.ttsModel, voice: g.ttsVoice }) : new MockTtsProvider();
 
 const { app, commands } = await buildApp({
@@ -42,6 +42,7 @@ const { app, commands } = await buildApp({
   logger: true,
   rulesLookup: config.rulesLookup,
   spendCaps: config.spendCaps,
+  imagesEnabled: config.images,
   tunnel: { ...config.tunnel, log: (msg, err) => (err ? console.error(msg, err) : console.log(`[tavern] ${msg}`)) },
   ...(config.rateLimits ? { httpLimits: HTTP_LIMITS } : { commandsPerMinute: 100_000, turnsPerMinute: 100_000 }),
 });
@@ -57,7 +58,7 @@ const backups = new NightlyBackups({
 backups.start();
 
 await app.listen({ port: config.port, host: config.host });
-app.log.info(`Tavern listening on ${config.port} (LLM: ${llm.name}, images: ${images.name})`);
+app.log.info(`Tavern listening on ${config.port} (LLM: ${llm.name}, images: ${config.images ? images.name : 'off'})`);
 // Handy for testing on a phone on the same Wi-Fi.
 if (config.host === '0.0.0.0') {
   for (const addrs of Object.values(networkInterfaces())) {

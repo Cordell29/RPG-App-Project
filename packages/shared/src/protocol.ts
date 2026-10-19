@@ -175,6 +175,8 @@ export interface SyncMessage {
   publicUrl?: string | null;
   /** Host only: returning players asking to take back their character. */
   rejoinRequests?: RejoinRequestInfo[];
+  /** What this server has switched on (pictures can be off, e.g. on a free Gemini key). */
+  features?: { images: boolean };
 }
 
 export interface RejoinRequestInfo {

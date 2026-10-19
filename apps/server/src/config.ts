@@ -14,6 +14,8 @@ export interface Config {
   /** Which AI runs the GM: 'anthropic', 'gemini', or 'auto' (Claude if its key is set, else Gemini, else offline mock). */
   llmProvider: 'anthropic' | 'gemini' | 'auto';
   spendCaps: { roomUsd: number; globalUsd: number };
+  /** Generate pictures (portraits, scenes). IMAGES=off for a free Gemini key: images have no free tier. */
+  images: boolean;
   /** Per-IP and per-player rate limits (turn off only for local testing). */
   rateLimits: boolean;
   tunnel: { publicUrl: string | null; metricsUrl: string | null; webhookUrl: string | null };
@@ -58,6 +60,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     llmProvider: (['anthropic', 'gemini'] as const).find((p) => p === env.LLM_PROVIDER?.trim().toLowerCase()) ?? 'auto',
     spendCaps: { roomUsd: num(env.SPEND_CAP_ROOM_USD, 5), globalUsd: num(env.SPEND_CAP_GLOBAL_USD, 20) },
     rateLimits: (env.RATE_LIMITS ?? 'on').toLowerCase() !== 'off',
+    images: (env.IMAGES ?? 'on').toLowerCase() !== 'off',
     tunnel: {
       publicUrl: env.PUBLIC_URL?.trim() || null,
       metricsUrl: env.TUNNEL_METRICS_URL?.trim() || null,

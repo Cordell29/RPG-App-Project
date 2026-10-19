@@ -159,6 +159,7 @@ function HostTurnControls() {
   const { send, state, settings, turnStatus } = useRoom();
   const media = useMedia();
   const scenePainting = !!media.latestScene && media.status.get(media.latestScene) === 'pending';
+  const imagesOn = useRoom((s) => s.features.images);
   const [error, setError] = useState<string | null>(null);
   const run = async (body: Parameters<typeof send>[0]) => {
     setError(null);
@@ -189,9 +190,11 @@ function HostTurnControls() {
             Write recap
           </button>
         )}
-        <button type="button" className="btn py-1 text-sm" disabled={scenePainting} onClick={() => run({ type: 'request_image', kind: 'scene' })}>
-          {scenePainting ? 'Painting scene…' : 'Illustrate scene'}
-        </button>
+        {imagesOn && (
+          <button type="button" className="btn py-1 text-sm" disabled={scenePainting} onClick={() => run({ type: 'request_image', kind: 'scene' })}>
+            {scenePainting ? 'Painting scene…' : 'Illustrate scene'}
+          </button>
+        )}
         <label className="flex items-center gap-1" title="The server records narration with an AI voice (small cost per clip). Players still choose whether to listen.">
           <input type="checkbox" checked={!!settings?.aiVoice} onChange={(e) => run({ type: 'set_ai_voice', on: e.target.checked })} />
           AI voice

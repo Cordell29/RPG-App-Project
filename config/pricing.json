@@ -1,11 +1,76 @@
 {
-  "_note": "USD per million tokens, used only to ESTIMATE spend for the room and global caps. Claude prices from Anthropic's list (Oct 2026); cache writes estimated at 1.25x input. Gemini text prices are placeholders: check https://ai.google.dev/pricing and edit. Unknown models fall back to 'default' (deliberately pessimistic). Also set hard monthly limits in the Anthropic and Google billing consoles.",
+  "_note": "USD per million tokens, used only to ESTIMATE spend for the room and global caps. Claude prices from Anthropic's list (Oct 2026); cache writes estimated at 1.25x input. Gemini prices are from third-party guides (Oct 2026; Flash at its introductory rate): check https://ai.google.dev/pricing and edit. Free-tier usage costs nothing but is still counted here as an estimate. Unknown models fall back to 'default' (deliberately pessimistic). Also set hard monthly limits in the Anthropic and Google billing consoles.",
   "models": {
-    "claude-sonnet-5-5": { "input": 2.0, "output": 10.0, "cacheRead": 0.2, "cacheWrite": 2.5 },
-    "claude-haiku-5-5": { "input": 0.1, "output": 0.5, "cacheRead": 0.01, "cacheWrite": 0.125 },
-    "claude-opus-5-5": { "input": 4.0, "output": 20.0, "cacheRead": 0.2, "cacheWrite": 5.0 },
-    "models/gemini-4-argon": { "input": 2.0, "output": 12.0, "cacheRead": 0.2, "cacheWrite": 2.0 },
-    "default": { "input": 5.0, "output": 25.0, "cacheRead": 0.5, "cacheWrite": 6.25 }
+    "claude-sonnet-5-5": {
+      "input": 2.0,
+      "output": 10.0,
+      "cacheRead": 0.2,
+      "cacheWrite": 2.5
+    },
+    "claude-haiku-5-5": {
+      "input": 0.1,
+      "output": 0.5,
+      "cacheRead": 0.01,
+      "cacheWrite": 0.125
+    },
+    "claude-opus-5-5": {
+      "input": 4.0,
+      "output": 20.0,
+      "cacheRead": 0.2,
+      "cacheWrite": 5.0
+    },
+    "models/gemini-4-argon": {
+      "input": 2.0,
+      "output": 12.0,
+      "cacheRead": 0.2,
+      "cacheWrite": 2.0
+    },
+    "models/gemini-flash-latest": {
+      "input": 0.75,
+      "output": 3.75,
+      "cacheRead": 0.075,
+      "cacheWrite": 0.75
+    },
+    "models/gemini-3-flash-preview": {
+      "input": 0.75,
+      "output": 3.75,
+      "cacheRead": 0.075,
+      "cacheWrite": 0.75
+    },
+    "models/gemini-2.5-flash": {
+      "input": 0.75,
+      "output": 3.75,
+      "cacheRead": 0.075,
+      "cacheWrite": 0.75
+    },
+    "models/gemini-2.5-flash-lite": {
+      "input": 0.1,
+      "output": 0.4,
+      "cacheRead": 0.01,
+      "cacheWrite": 0.1
+    },
+    "models/gemini-flash-lite-latest": {
+      "input": 0.1,
+      "output": 0.4,
+      "cacheRead": 0.01,
+      "cacheWrite": 0.1
+    },
+    "models/gemini-3.1-pro-preview": {
+      "input": 2.0,
+      "output": 12.0,
+      "cacheRead": 0.2,
+      "cacheWrite": 2.0
+    },
+    "default": {
+      "input": 5.0,
+      "output": 25.0,
+      "cacheRead": 0.5,
+      "cacheWrite": 6.25
+    }
   },
-  "perUnit": { "image": 0.04, "voice": 0.01, "webSearch": 0.01 }
+  "perUnit": {
+    "image": 0.04,
+    "voice": 0.01,
+    "webSearch": 0.01
+  }
 }

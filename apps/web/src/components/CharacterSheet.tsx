@@ -133,6 +133,7 @@ export function vitals(c: Character) {
 export function CharacterSheet({ character: c, setting, canEdit }: { character: Character; setting: SettingPreset | null; canEdit: boolean }) {
   const send = useRoom((s) => s.send);
   const isHost = useRoom((s) => s.isHost);
+  const imagesOn = useRoom((s) => s.features.images);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({ name: c.name, notes: c.notes, visualDescriptor: c.visualDescriptor });
   const [error, setError] = useState<string | null>(null);
@@ -171,7 +172,7 @@ export function CharacterSheet({ character: c, setting, canEdit }: { character: 
             {[c.ancestry, c.class].filter(Boolean).join(' ')} · Level {c.level}
           </p>
         </div>
-        {canEdit && <NewPortraitButton character={c} />}
+        {canEdit && imagesOn && <NewPortraitButton character={c} />}
         {isHost && (
           <button type="button" className={`btn py-1 text-sm ${hostOpen ? 'btn-primary' : ''}`} aria-expanded={hostOpen} onClick={() => setHostOpen((o) => !o)}>
             Host edit

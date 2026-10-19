@@ -142,7 +142,10 @@ export class GeminiTextProvider implements LLMProvider {
   async chat(req: ChatRequest): Promise<ChatResponse> {
     const params = this.params(req);
     try {
-      const interaction = (await this.ai.interactions.create(params as Interactions.CreateModelInteractionParamsNonStreaming, req.signal ? ({ signal: req.signal } as never) : undefined)) as Interactions.Interaction;
+      const interaction = (await withRetry(
+        () => this.ai.interactions.create(params as Interactions.CreateModelInteractionParamsNonStreaming, req.signal ? ({ signal: req.signal } as never) : undefined),
+        req.signal ? { signal: req.signal } : {},
+      )) as Interactions.Interaction;
       return this.toResponse(interaction, params.model);
     } catch (err) {
       throw wrap(err);
@@ -154,7 +157,10 @@ export class GeminiTextProvider implements LLMProvider {
     let full = '';
     let usage: Interactions.Usage | undefined;
     try {
-      const stream = (await this.ai.interactions.create(params as Interactions.CreateModelInteractionParamsStreaming, req.signal ? ({ signal: req.signal } as never) : undefined)) as AsyncIterable<Interactions.InteractionSSEEvent>;
+      const stream = (await withRetry(
+        () => this.ai.interactions.create(params as Interactions.CreateModelInteractionParamsStreaming, req.signal ? ({ signal: req.signal } as never) : undefined),
+        req.signal ? { signal: req.signal } : {},
+      )) as AsyncIterable<Interactions.InteractionSSEEvent>;
       for await (const ev of stream) {
         if (ev.event_type === 'step.delta' && ev.delta.type === 'text') {
           full += ev.delta.text;
@@ -185,7 +191,7 @@ export class GeminiTextProvider implements LLMProvider {
     const params = this.params(chatReq, [{ name: SUBMIT, description: 'Submit the result.', input_schema: schema }], 'any');
     let res: ChatResponse;
     try {
-      res = this.toResponse((await this.ai.interactions.create(params as Interactions.CreateModelInteractionParamsNonStreaming)) as Interactions.Interaction, params.model);
+      res = this.toResponse((await withRetry(() => this.ai.interactions.create(params as Interactions.CreateModelInteractionParamsNonStreaming))) as Interactions.Interaction, params.model);
     } catch (err) {
       throw wrap(err);
     }
@@ -201,6 +207,25 @@ export class GeminiTextProvider implements LLMProvider {
     const parsed = (req.schema as z.ZodType<T>).safeParse(raw);
     if (!parsed.success) throw new LLMError('The model returned output that did not match the schema.');
     return { data: parsed.data, usage: res.usage };
+  }
+}
+
+/**
+ * Free-tier keys are limited to a few requests a minute and a GM turn makes several, so on
+ * 429 (or a brief 503) wait as Google asks (retryDelay, else 5 s then 15 s) and try again.
+ */
+export async function withRetry<T>(fn: () => Promise<T>, opts: { signal?: AbortSignal; sleep?: (ms: number) => Promise<void> } = {}): Promise<T> {
+  const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  const waits = [5_000, 15_000];
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const e = err as { status?: number; message?: string };
+      if ((e?.status !== 429 && e?.status !== 503) || attempt >= waits.length || opts.signal?.aborted) throw err;
+      const asked = /retryDelay"?\s*[:=]\s*"?(\d+(?:\.\d+)?)s/.exec(String(e.message ?? ''))?.[1];
+      await sleep(Math.min(asked ? Number(asked) * 1000 + 250 : waits[attempt]!, 30_000));
+    }
   }
 }
 

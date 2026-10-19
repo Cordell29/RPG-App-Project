@@ -48,6 +48,8 @@ export interface AppDeps {
   httpLimits?: Partial<Record<keyof typeof HTTP_LIMITS, number>>;
   /** Socket commands per player per minute (default 30). */
   commandsPerMinute?: number;
+  /** Pictures on/off (IMAGES=off skips image generation entirely). Default on. */
+  imagesEnabled?: boolean;
   /** Public link discovery (Cloudflare Quick Tunnel metrics, PUBLIC_URL, share webhook). */
   tunnel?: TunnelOptions;
 }
@@ -284,6 +286,7 @@ export async function buildApp(deps: AppDeps): Promise<TavernApp> {
     settings: (roomId) => rooms.settings(rooms.requireRoom(roomId)),
     onEvents: publish,
     spend,
+    imagesEnabled: deps.imagesEnabled ?? true,
     ...(deps.assetBackoffMs ? { backoffMs: deps.assetBackoffMs } : {}),
   });
   const memory = new Chronicler({ db: deps.db, store, llm, onEvents: publish });
@@ -295,6 +298,7 @@ export async function buildApp(deps: AppDeps): Promise<TavernApp> {
     rooms,
     llm,
     gate: (roomId) => spend.check(roomId),
+    imagesEnabled: deps.imagesEnabled ?? true,
     ...(deps.turnsPerMinute ? { turnsPerMinute: deps.turnsPerMinute } : {}),
     onEvents: publish,
     emit: (roomId, name, payload) => io?.to(roomId).emit(name, payload as never),
@@ -320,7 +324,7 @@ export async function buildApp(deps: AppDeps): Promise<TavernApp> {
     commands,
     turnStatus: (roomId) => turns.status(roomId),
     afterPublish: (roomId, events) => assets.onCommitted(roomId, events),
-    extraSync: (player) => ({ publicUrl: tunnel.current, ...(player.isHost ? { rejoinRequests: rejoin.pending(player.roomId) } : {}) }),
+    extraSync: (player) => ({ publicUrl: tunnel.current, features: { images: assets.imagesEnabled }, ...(player.isHost ? { rejoinRequests: rejoin.pending(player.roomId) } : {}) }),
     ...(deps.commandsPerMinute ? { commandsPerMinute: deps.commandsPerMinute } : {}),
   });
   rejoin.onChange = (roomId) => {

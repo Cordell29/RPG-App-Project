@@ -226,3 +226,20 @@ describe('AI voice', () => {
     expect(t.commands.execute(guest, { commandId: 'guest-voice-1', type: 'set_ai_voice', on: true })).toEqual({ ok: false, error: 'Only the host can do that.' });
   });
 });
+
+describe('pictures switched off (IMAGES=off, e.g. a free Gemini key)', () => {
+  it('no portrait is requested, scenes are refused with a clear reason, and the GM is not offered the tool', async () => {
+    const llm = devMockProvider();
+    const t = await buildApp({ dataDir: tmpDir(), db: testDb(), llm, rulesLookup: false, imagesEnabled: false });
+    apps.push(t);
+    const r = room(t);
+    expect(r.cmd({ type: 'create_character', character: fighter })).toMatchObject({ ok: true });
+    expect(events(t, r.roomId, 'image_requested')).toHaveLength(0);
+    expect(r.cmd({ type: 'request_image', kind: 'scene' })).toEqual({ ok: false, error: 'Pictures are switched off on this server (IMAGES=off in .env).' });
+    r.cmd({ type: 'submit_action', text: 'I look around.' });
+    await t.turns.whenIdle(r.roomId);
+    const gmCall = llm.calls.find((c) => c.purpose === 'gm_adjudicate') as { tools?: { name: string }[] } | undefined;
+    expect(gmCall?.tools?.map((x) => x.name)).not.toContain('request_image');
+    expect(gmCall?.tools?.length).toBeGreaterThan(3);
+  });
+});

@@ -41,6 +41,10 @@ if (config.gemini) {
       if (names.has(full)) ok(`${label} model "${model}" is available`);
       else bad(`${label} model "${model}" is NOT in your key's model list; pick one of the models below and set it in .env`);
     }
+    if (!/flash/i.test(config.gemini.textModel)) {
+      note(`"${config.gemini.textModel}" is not a Flash model. On a FREE key only Flash models work: set GEMINI_TEXT_MODEL=models/gemini-flash-latest`);
+    }
+    if (config.images) note('IMAGES is on. Pictures need a paid (billing-enabled) Gemini key; set IMAGES=off on a free key.');
     const textish = [...names].filter((n) => /gemini/.test(n) && !/embedding|image|tts|audio|live/.test(n)).slice(0, 12);
     note(`text models your key can use: ${textish.join(', ') || 'none'}`);
     try {

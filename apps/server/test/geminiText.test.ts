@@ -102,3 +102,25 @@ describe('Gemini (Interactions API) provider', () => {
     ]);
   });
 });
+
+describe('free-tier rate limits', () => {
+  it('waits and retries on 429 (using Google\'s retryDelay when given), then gives up', async () => {
+    const { withRetry } = await import('../src/llm/geminiText.ts');
+    const waits: number[] = [];
+    const sleep = async (ms: number) => void waits.push(ms);
+    let calls = 0;
+    const flaky = async () => {
+      calls++;
+      if (calls === 1) throw Object.assign(new Error('{"retryDelay":"7s"}'), { status: 429 });
+      if (calls === 2) throw Object.assign(new Error('busy'), { status: 503 });
+      return 'ok';
+    };
+    expect(await withRetry(flaky, { sleep })).toBe('ok');
+    expect(waits).toEqual([7250, 15000]);
+    const always = async () => {
+      throw Object.assign(new Error('quota'), { status: 429 });
+    };
+    await expect(withRetry(always, { sleep })).rejects.toThrow('quota');
+    await expect(withRetry(async () => { throw Object.assign(new Error('bad key'), { status: 401 }); }, { sleep })).rejects.toThrow('bad key');
+  });
+});
