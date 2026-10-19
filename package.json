@@ -13,7 +13,8 @@
     "dev": "pnpm -r --parallel --filter @tavern/server --filter @tavern/web dev",
     "build": "pnpm --filter @tavern/web build",
     "check:bundle": "node scripts/check-bundle.mjs",
-    "start": "pnpm build && pnpm --filter @tavern/server start"
+    "start": "pnpm build && pnpm --filter @tavern/server start",
+    "check:keys": "node --env-file-if-exists=.env apps/server/scripts/check-keys.ts"
   },
   "devDependencies": {
     "@playwright/test": "1.56.1",

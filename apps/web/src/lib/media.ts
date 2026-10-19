@@ -16,11 +16,13 @@ export interface MediaIndex {
   voice: Map<number, string>;
   /** Seq of the latest image_ready per asset; changes when a missing file is repainted. */
   version: Map<string, number>;
+  /** Why an image failed (shown so the host knows what to fix). */
+  failReason: Map<string, string>;
 }
 
 /** Folds image/audio events into lookups the UI needs. Pure, so it is cheap to memoise. */
 export function buildMedia(events: GameEvent[]): MediaIndex {
-  const m: MediaIndex = { status: new Map(), portraitRequest: new Map(), byTurn: new Map(), latestScene: null, voice: new Map(), version: new Map() };
+  const m: MediaIndex = { status: new Map(), portraitRequest: new Map(), byTurn: new Map(), latestScene: null, voice: new Map(), version: new Map(), failReason: new Map() };
   for (const e of events) {
     if (e.type === 'image_requested') {
       const { assetId, kind, subject, characterId } = e.payload;
@@ -36,7 +38,10 @@ export function buildMedia(events: GameEvent[]): MediaIndex {
       m.status.set(e.payload.assetId, 'ready');
       m.version.set(e.payload.assetId, e.seq);
     }
-    else if (e.type === 'image_failed') m.status.set(e.payload.assetId, 'failed');
+    else if (e.type === 'image_failed') {
+      m.status.set(e.payload.assetId, 'failed');
+      m.failReason.set(e.payload.assetId, e.payload.reason);
+    }
     else if (e.type === 'audio_ready') m.voice.set(e.payload.narrationSeq, e.payload.assetId);
   }
   return m;

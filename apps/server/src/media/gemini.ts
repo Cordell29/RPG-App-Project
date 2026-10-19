@@ -1,5 +1,15 @@
 import { GoogleGenAI, Modality } from '@google/genai';
+import { explainGoogleError } from '../llm/googleErrors.ts';
 import { type ImageProvider, MediaError, type TtsProvider, pcmToWav } from './provider.ts';
+
+async function call<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    const plain = explainGoogleError(err);
+    throw plain ? new MediaError(plain) : err;
+  }
+}
 
 /** Gemini image generation ("Nano Banana"). Model id from GEMINI_IMAGE_MODEL. */
 export class GeminiImageProvider implements ImageProvider {
@@ -13,11 +23,13 @@ export class GeminiImageProvider implements ImageProvider {
   }
 
   async generate(prompt: string, signal?: AbortSignal): Promise<Buffer> {
-    const res = await this.ai.models.generateContent({
-      model: this.model,
-      contents: prompt,
-      config: { responseModalities: [Modality.IMAGE], ...(signal ? { abortSignal: signal } : {}) },
-    });
+    const res = await call(() =>
+      this.ai.models.generateContent({
+        model: this.model,
+        contents: prompt,
+        config: { responseModalities: [Modality.IMAGE], ...(signal ? { abortSignal: signal } : {}) },
+      }),
+    );
     const part = res.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);
     if (!part?.inlineData?.data) {
       const reason = res.candidates?.[0]?.finishReason ?? res.promptFeedback?.blockReason ?? 'no image returned';
@@ -41,7 +53,7 @@ export class GeminiTtsProvider implements TtsProvider {
   }
 
   async synthesize(text: string, signal?: AbortSignal): Promise<Buffer> {
-    const res = await this.ai.models.generateContent({
+    const res = await call(() => this.ai.models.generateContent({
       model: this.model,
       contents: `Read this like a storyteller at a tabletop game, warm and paced: ${text}`,
       config: {
@@ -49,7 +61,7 @@ export class GeminiTtsProvider implements TtsProvider {
         speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: this.voice } } },
         ...(signal ? { abortSignal: signal } : {}),
       },
-    });
+    }));
     const data = res.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data)?.inlineData?.data;
     if (!data) throw new MediaError('Speech generation returned no audio.');
     return pcmToWav(Buffer.from(data, 'base64'));

@@ -56,7 +56,7 @@ function Illustration({ assetId, alt, className = '' }: { assetId: string; alt: 
   if (status === 'failed' || broken === src)
     return (
       <p className="text-xs text-muted" data-testid="illustration-failed">
-        (The illustration of {alt} could not be painted.)
+        (The illustration of {alt} could not be painted{media.failReason.get(assetId) ? `: ${media.failReason.get(assetId)}` : ''}.)
       </p>
     );
   return (

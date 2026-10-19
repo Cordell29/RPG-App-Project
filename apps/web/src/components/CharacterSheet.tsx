@@ -68,7 +68,7 @@ export function Portrait({ character, size = 56 }: { character: Character; size?
     <div
       className="relative flex shrink-0 items-center justify-center overflow-hidden rounded-[var(--t-radius)] border-2 border-line bg-raised heading font-bold text-muted"
       style={{ width: size, height: size, fontSize: size * 0.38 }}
-      title={failed ? 'The portrait could not be painted' : painting ? 'Painting a portrait…' : undefined}
+      title={failed ? `The portrait could not be painted${requested && media.failReason.get(requested) ? `: ${media.failReason.get(requested)}` : ''}` : painting ? 'Painting a portrait…' : undefined}
       data-testid="portrait"
       data-state={id ? 'ready' : painting ? 'painting' : failed ? 'failed' : 'none'}
     >

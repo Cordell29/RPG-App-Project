@@ -12,6 +12,7 @@ import {
   type ToolUse,
   type Usage,
 } from './provider.ts';
+import { explainGoogleError } from './googleErrors.ts';
 
 export interface GeminiTextConfig {
   apiKey: string;
@@ -206,7 +207,8 @@ export class GeminiTextProvider implements LLMProvider {
 function wrap(err: unknown): Error {
   if (err instanceof LLMError) return err;
   const e = err as { status?: number; message?: string };
-  if (e?.status === 429) return new LLMError('The AI service is rate-limiting us. Wait a moment, then retry.');
+  const plain = explainGoogleError(err);
+  if (plain) return new LLMError(plain);
   if (typeof e?.status === 'number') return new LLMError(`AI service error ${e.status}: ${e.message ?? ''}`.trim());
   return err as Error;
 }
