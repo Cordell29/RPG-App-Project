@@ -8,6 +8,7 @@ describe('explainGoogleError', () => {
     expect(explainGoogleError({ status: 403, message: 'PERMISSION_DENIED' })).toMatch(/Generative Language API/);
     expect(explainGoogleError({ status: 404, message: 'model not found' })).toMatch(/model name/);
     expect(explainGoogleError({ status: 429 })).toMatch(/quota/);
+    expect(explainGoogleError({ status: 401, message: '{"error":{"details":[{"reason":"ACCESS_TOKEN_TYPE_UNSUPPORTED"}]}}' })).toMatch(/did not accept this Gemini key[\s\S]*new project[\s\S]*check:keys/);
     expect(explainGoogleError({ status: 500, message: 'boom' })).toBeNull();
   });
 });

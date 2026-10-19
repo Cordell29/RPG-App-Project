@@ -6,6 +6,9 @@ export function explainGoogleError(err: unknown): string | null {
   const e = err as { status?: number; message?: string };
   const msg = String(e?.message ?? '');
   const status = typeof e?.status === 'number' ? e.status : Number(/\b(4\d\d|5\d\d)\b/.exec(msg)?.[1] ?? NaN);
+  if (/ACCESS_TOKEN_TYPE_UNSUPPORTED/.test(msg)) {
+    return 'Google did not accept this Gemini key (ACCESS_TOKEN_TYPE_UNSUPPORTED). Check the whole key was copied into GEMINI_API_KEY in .env, with nothing missing. If it is complete, create a new key in a new project at aistudio.google.com/apikey, then run "pnpm check:keys".';
+  }
   if (/API key not valid|API_KEY_INVALID/i.test(msg) || status === 401) {
     return 'Google rejected the Gemini API key. Check GEMINI_API_KEY in your .env file: paste the whole key from aistudio.google.com/apikey right after the = (no quotes or spaces), then restart Tavern. Run "pnpm check:keys" to test it.';
   }

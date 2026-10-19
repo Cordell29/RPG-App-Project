@@ -10,11 +10,12 @@ const bad = (s: string) => console.log(`  ❌ ${s}`);
 const note = (s: string) => console.log(`  ·  ${s}`);
 
 /** Spot common paste mistakes without revealing the key. */
-function shape(name: string, raw: string | undefined, prefix: string) {
+function shape(name: string, raw: string | undefined, prefixes: string[]) {
   if (!raw) return bad(`${name} is empty or missing in .env`);
   if (/^\s|\s$/.test(raw)) bad(`${name} has spaces before or after it; remove them`);
   if (/^["']|["']$/.test(raw.trim())) bad(`${name} is wrapped in quote marks; remove them`);
-  if (!raw.trim().replace(/^["']|["']$/g, '').startsWith(prefix)) bad(`${name} should start with "${prefix}"; check you copied the right thing`);
+  const key = raw.trim().replace(/^["']|["']$/g, '');
+  if (!prefixes.some((p) => key.startsWith(p))) bad(`${name} should start with ${prefixes.map((p) => `"${p}"`).join(' or ')}; check you copied the right thing`);
   note(`${name}: ${raw.trim().length} characters, starts with "${raw.trim().slice(0, 4)}…"`);
 }
 
@@ -22,7 +23,8 @@ const config = loadConfig();
 console.log('\nTavern key check\n');
 
 console.log('Gemini (GEMINI_API_KEY)');
-shape('GEMINI_API_KEY', process.env.GEMINI_API_KEY, 'AIza');
+// Google now issues "AQ." keys from AI Studio; older keys start with "AIza".
+shape('GEMINI_API_KEY', process.env.GEMINI_API_KEY, ['AQ.', 'AIza']);
 if (config.gemini) {
   const ai = new GoogleGenAI({ apiKey: config.gemini.apiKey });
   try {
@@ -50,13 +52,19 @@ if (config.gemini) {
     }
   } catch (err) {
     bad(explainGoogleError(err) ?? String((err as Error).message).slice(0, 300));
+    const raw = String((err as Error).message ?? '');
+    const reason = /"reason"\s*:\s*"([A-Z_]+)"/.exec(raw)?.[1];
+    if (reason) note(`Google's reason code: ${reason}`);
+  }
+  for (const v of ['GOOGLE_GENAI_USE_VERTEXAI', 'GOOGLE_GENAI_ACCESS_TOKEN', 'GOOGLE_CLOUD_PROJECT']) {
+    if (process.env[v]) bad(`${v} is set in your environment; it can make Google treat the key as a different kind of login. Remove it.`);
   }
 }
 
 console.log('\nClaude (ANTHROPIC_API_KEY)');
 if (!process.env.ANTHROPIC_API_KEY?.trim()) note('not set (fine if you only use Gemini)');
 else {
-  shape('ANTHROPIC_API_KEY', process.env.ANTHROPIC_API_KEY, 'sk-ant-');
+  shape('ANTHROPIC_API_KEY', process.env.ANTHROPIC_API_KEY, ['sk-ant-']);
   try {
     await new Anthropic({ apiKey: config.anthropic!.apiKey }).models.list({ limit: 1 });
     ok('Anthropic accepted the key');
